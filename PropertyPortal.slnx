@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="PropertyPortal.API/PropertyPortal.API.csproj" />
+  <Project Path="PropertyPortal.Application/PropertyPortal.Application.csproj" />
+  <Project Path="PropertyPortal.Domain/PropertyPortal.Domain.csproj" />
+  <Project Path="PropertyPortal.Infrastructure/PropertyPortal.Infrastructure.csproj" />
+</Solution>
