@@ -1,12 +1,15 @@
-﻿using PropertyPortal.Domain.Common;
+﻿using PropertyPortal.Domain.Core.Interfaces;
+using PropertyPortal.Domain.Common;
 
 namespace PropertyPortal.Domain.Entities;
 
-public partial class Unit : BaseEntity
+public partial class Unit : BaseEntity, ILocatable
 {
     public Guid PropertyId { get; set; }
 
     public string UnitNumber { get; set; } = null!;
+
+    public string? Description { get; set; } 
 
     public int? Bedrooms { get; set; }
 
@@ -21,4 +24,9 @@ public partial class Unit : BaseEntity
     public virtual Property Property { get; set; } = null!;
 
     public virtual Tenant Tenant { get; set; } = null!;
+    
+    // from ILocatable interface
+    public string Name { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+    
+    public Address Address { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 }

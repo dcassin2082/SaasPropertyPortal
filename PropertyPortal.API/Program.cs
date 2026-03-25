@@ -1,11 +1,17 @@
 using Application.Common.Interfaces;
+using FluentValidation;
+using Mapster;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using PropertyPortal.API.Converters;
 using PropertyPortal.API.Filters;
 using PropertyPortal.Application.Common.Interfaces;
+using PropertyPortal.Application.DTOs.Properties;
+using PropertyPortal.Application.Validators.Properties;
+using PropertyPortal.Domain.Entities;
 using PropertyPortal.Infrastructure.Data;
+using PropertyPortal.Infrastructure.Filters;
 using PropertyPortal.Infrastructure.Interceptors;
 using PropertyPortal.Infrastructure.Repositories;
 using PropertyPortal.Infrastructure.Tenancy;
@@ -32,12 +38,30 @@ builder.Services.AddScoped(typeof(AuditInterceptor));
 
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(PropertyPortal.Application.Properties.GetPropertiesQuery).Assembly));
 
+////Mapster: this config is only necessary if DTO / Entity field names are different(i.e.dto.Num -> unit.UnitNumber), otherwise it works out of the box
+//TypeAdapterConfig<UnitUpdateDto, Unit>.NewConfig().Map(dest => dest.UnitNumber, src => src.Num);  // add using Mapster;
+
+// Calculated fields in PropertyResponseDto 
+// Mapster will turn these into SQL: COUNT(Units.Id) and SUM(Units.Rent)
+//TypeAdapterConfig<Property, PropertyResponseDto>.NewConfig()
+//    .Map(dest => dest.UnitCount, src => src.Units.Count)
+//    .Map(dest => dest.TotalMonthlyRent, src => src.Units.Sum(u => u.Rent));
+// same thing with null checking
+TypeAdapterConfig<Property, PropertyResponseDto>
+    .NewConfig()
+    .Map(dest => dest.Address, src => src.Address) // force explicit mapping of the Address record
+    .Map(dest => dest.UnitCount, src => src.Units != null ? src.Units.Count : 0)
+    .Map(dest => dest.TotalMonthlyRent, src => src.Units != null ? src.Units.Sum(u => u.Rent) : 0);
+
 /*************************************************************************************************/
+
+builder.Services.AddValidatorsFromAssembly(typeof(PropertyCreateDtoValidator).Assembly);
 
 builder.Services.AddControllers(options =>
 {
     options.Filters.Add<ConcurrencyExceptionFilter>(); // Existing
     options.Filters.Add<ApiExceptionFilter>();    // New
+    options.Filters.Add<ValidationFilter>();
 })
     .AddJsonOptions(options =>
     {

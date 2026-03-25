@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using PropertyPortal.Domain.Entities;
+using System.ComponentModel.DataAnnotations;
 
 namespace PropertyPortal.Domain.Common
 {
