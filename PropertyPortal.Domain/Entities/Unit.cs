@@ -9,8 +9,6 @@ public partial class Unit : BaseEntity, ILocatable
 
     public string UnitNumber { get; set; } = null!;
 
-    public string? Description { get; set; } 
-
     public int? Bedrooms { get; set; }
 
     public int? Bathrooms { get; set; }
@@ -21,12 +19,14 @@ public partial class Unit : BaseEntity, ILocatable
 
     public virtual ICollection<MaintenanceRequest> MaintenanceRequests { get; set; } = new List<MaintenanceRequest>();
 
+    public virtual ICollection<Resident> Residents { get; set; } = new List<Resident>();
+
     public virtual Property Property { get; set; } = null!;
 
     public virtual Tenant Tenant { get; set; } = null!;
-    
+
     // from ILocatable interface
-    public string Name { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-    
-    public Address Address { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+    public string Name { get; set; } = null!;
+    public required Address Address { get; set; } // EF will flatten this into Property_Street, etc.
+    public string? Description { get; set; }
 }

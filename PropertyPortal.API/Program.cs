@@ -8,6 +8,7 @@ using PropertyPortal.API.Converters;
 using PropertyPortal.API.Filters;
 using PropertyPortal.Application.Common.Interfaces;
 using PropertyPortal.Application.DTOs.Properties;
+using PropertyPortal.Application.DTOs.Residents;
 using PropertyPortal.Application.Validators.Properties;
 using PropertyPortal.Domain.Entities;
 using PropertyPortal.Infrastructure.Data;
@@ -53,6 +54,17 @@ TypeAdapterConfig<Property, PropertyResponseDto>
     .Map(dest => dest.UnitCount, src => src.Units != null ? src.Units.Count : 0)
     .Map(dest => dest.TotalMonthlyRent, src => src.Units != null ? src.Units.Sum(u => u.Rent) : 0);
 
+TypeAdapterConfig<Resident, ResidentResponseDto>
+    .NewConfig()
+    // Explicitly map the Address complex type
+    .Map(dest => dest.Address, src => src.Address)
+    // Flatten the Property Name from the navigation property
+    .Map(dest => dest.PropertyName, src => src.Property != null ? src.Property.Name : "Unassigned");
+
+TypeAdapterConfig<ResidentRequestDto, Resident>
+    .NewConfig()
+    .Map(dest => dest.Address, src => src.Address);
+
 /*************************************************************************************************/
 
 builder.Services.AddValidatorsFromAssembly(typeof(PropertyCreateDtoValidator).Assembly);
@@ -94,8 +106,11 @@ builder.Services.AddAuthentication(options =>
 // Prevents mapping 'sub' to long XML namespaces - must be added before any Authentication configuration
 JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear(); // clear the weird Microsoft claim mapping
 
+builder.Services.AddCors();
+
 var app = builder.Build();
 
+app.UseCors(builder => builder.AllowAnyMethod().AllowAnyHeader().AllowAnyOrigin());
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {

@@ -16,4 +16,6 @@ public partial class Property : BaseEntity, ILocatable
     public string? Description { get; set; } 
 
     public virtual ICollection<Unit> Units { get; set; } = new List<Unit>();
+
+    public virtual ICollection<Resident> Residents { get; set; } = new List<Resident>();
 }

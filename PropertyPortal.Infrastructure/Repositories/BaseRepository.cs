@@ -32,13 +32,39 @@ namespace PropertyPortal.Infrastructure.Repositories
         {
             // The Global Query Filter we set up earlier handles the TenantId check automatically.
             // If a user tries to access an ID from another tenant, this returns null.
-            return  await _context.Set<T>().FindAsync(id);
+            //return  await _context.Set<T>().FindAsync(id);
+            var result = await _context.Set<T>().FirstOrDefaultAsync(x => x.Id == id);
+            return result;
         }
 
         public virtual async Task<T> PutAsync(Guid id, T entity)
         {
+            SyncLocatableFields(entity);
             var existing = await _context.Set<T>().FindAsync(id);
             if (existing == null) throw new KeyNotFoundException("Record not found.");
+
+           // var resident = await _context.Residents.AsQueryable()
+           //.Include(r => r.Property)
+           //.IgnoreQueryFilters()
+           //.FirstOrDefaultAsync(x => x.Id == id);
+
+           // if (resident == null) throw new KeyNotFoundException("Record not found.");
+           // _context.Entry(existing).CurrentValues.SetValues(entity);
+
+           // // 2. Audit & Security (Modify the 'existing' object directly)
+           // resident.TenantId = _tenantProvider.GetTenantId();
+           // resident.UpdatedAt = DateTime.UtcNow;
+           // resident.UpdatedBy = _tenantProvider.GetUserId();
+
+            //// 3. Explicitly protect creation fields on the TRACKED object
+            //var entry = _context.Entry(existing);
+            //entry.Property(x => x.Id).IsModified = false; // Prevents the PK error
+            //entry.Property(x => x.CreatedAt).IsModified = false;
+            //entry.Property(x => x.CreatedBy).IsModified = false;
+            //return (T)(object)resident;
+
+            // EF will automatically handle RowVersion on 'existing'
+
 
             // 1. Sync values from incoming entity to the tracked database entity
             _context.Entry(existing).CurrentValues.SetValues(entity);
@@ -56,37 +82,11 @@ namespace PropertyPortal.Infrastructure.Repositories
 
             // EF will automatically handle RowVersion on 'existing'
             return existing;
-            //var existing = await _context.Set<T>().FindAsync(id);
-            //if (existing == null) throw new KeyNotFoundException("Record not found.");
-
-            //// Update the values on the tracked 'existing' object
-            //_context.Entry(existing).CurrentValues.SetValues(entity);
-
-            //// Ensure the ID matches
-            //entity.Id = id;
-
-            //// IMPORTANT: Ensure the TenantId matches the user's context
-            //// This prevents a user from "injecting" a different TenantId in the JSON body
-            //entity.TenantId = _tenantProvider.GetTenantId();
-
-            //// Audit trail
-            //entity.UpdatedAt = DateTime.UtcNow;
-            //entity.UpdatedBy = _tenantProvider.GetUserId();
-
-            ////// Mark as modified. EF Core will include the [RowVersion] in the WHERE clause.
-            ////_context.Entry(entity).State = EntityState.Modified;
-
-            //// Pro-Tip: Exclude 'CreatedAt' and 'CreatedBy' from being overwritten 
-            //// if they aren't sent back by the frontend.
-            //_context.Entry(entity).Property(x => x.CreatedAt).IsModified = false;
-            //_context.Entry(entity).Property(x => x.CreatedBy).IsModified = false;
-
-            ////await _context.SaveChangesAsync();
-            //return entity;
         }
 
         public virtual async Task<T> PostAsync(T entity)
         {
+            SyncLocatableFields(entity);
             // Force the TenantId from the secure Middleware/Provider
             if (entity is not Tenant)
             {
@@ -98,9 +98,6 @@ namespace PropertyPortal.Infrastructure.Repositories
             entity.CreatedBy = _tenantProvider.GetUserId() ?? Guid.Empty;
 
             await _context.Set<T>().AddAsync(entity);
-            //await _context.SaveChangesAsync();
-
-            //await _context.SaveChangesWithConcurrencyAsync(); // use extension method to handle concurrency exceptions
             return entity;
         }
 
@@ -114,7 +111,6 @@ namespace PropertyPortal.Infrastructure.Repositories
             entity.UpdatedAt = DateTime.UtcNow;
             entity.UpdatedBy = _tenantProvider.GetUserId();
 
-            //await _context.SaveChangesAsync();
             return entity;
         }
 
@@ -161,5 +157,19 @@ namespace PropertyPortal.Infrastructure.Repositories
 
             return new PaginatedResult<TDestination>(items, count, page, size);
         }
+
+        private void SyncLocatableFields(T entity)
+        {
+            if (entity is Resident resident)
+            {
+                // Auto-populate the ILocatable requirements from the Resident-specific fields
+                resident.Name = $"{resident.FirstName} {resident.LastName}".Trim();
+
+                // You could also include the Unit or Property name if they are loaded, 
+                // or just a descriptive string for searchability.
+                resident.Description = $"Resident at Unit {resident.Address.UnitNumber}";
+            }
+        }
+
     }
 }

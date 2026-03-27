@@ -30,7 +30,34 @@ public partial class ApplicationDbContext : DbContext
     public virtual DbSet<Unit> Units { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
+
+    public virtual DbSet<Resident> Residents { get; set; }
     /*  */
+
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        var tenantId = _tenantProvider.GetTenantId();
+
+        foreach (var entry in ChangeTracker.Entries<BaseEntity>())
+        {
+            switch (entry.State)
+            {
+                case EntityState.Added:
+                    // Force the TenantId on creation
+                    entry.Entity.TenantId = tenantId;
+                    entry.Entity.CreatedAt = DateTime.UtcNow;
+                    break;
+
+                case EntityState.Modified:
+                    // Ensure the TenantId doesn't get "wiped" during an update
+                    entry.Property(x => x.TenantId).IsModified = false;
+                    entry.Entity.UpdatedAt = DateTime.UtcNow;
+                    break;
+            }
+        }
+
+        return base.SaveChangesAsync(cancellationToken);
+    }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -90,6 +117,31 @@ public partial class ApplicationDbContext : DbContext
                 );
             }
         }
+        modelBuilder.Entity<PropertyManager>(entity =>
+        {
+            // Replace "PropertyManagers" with the EXACT name of the table in your SQL DB
+            entity.ToTable("PropertyManagers");
+
+            // 1. Define the composite primary key
+            entity.HasKey(pm => new { pm.PropertyId, pm.UserId });
+
+            // 2. Map relationships
+            entity.HasOne(pm => pm.Property)
+                .WithMany() // Or with .WithMany(p => p.Managers) if you add a collection to property
+                .HasForeignKey(pm => pm.PropertyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(pm => pm.User)
+                .WithMany()
+                .HasForeignKey(pm => pm.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // 3. Ensure Tenant Filter applies to the join table too
+            // (Assuming your BaseEntity filter logic handles this automatically)
+            entity.Ignore(pm => pm.Id);
+        });
+        
+
         modelBuilder.Entity<Lease>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK__Leases__3214EC07752D3833");
@@ -203,6 +255,7 @@ public partial class ApplicationDbContext : DbContext
 
             entity.Property(e => e.Id).ValueGeneratedNever();
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.Description).HasMaxLength(500);
             entity.Property(e => e.Name).HasMaxLength(200);
             entity.Property(e => e.PropertyType).HasMaxLength(50);
             entity.Property(e => e.RowVersion)
@@ -214,6 +267,55 @@ public partial class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Properties_Tenants");
         });
+
+        modelBuilder.Entity<Resident>(entity =>
+        {
+            // Force EF to treat the Id as a Guid
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnType("uniqueidentifier")
+            .HasColumnName("Id")
+            .ValueGeneratedNever();
+
+            // Also ensure the Foreign Keys are mapped correctly as Guids
+            entity.Property(e => e.PropertyId).HasColumnType("uniqueidentifier");
+            entity.Property(e => e.UnitId).HasColumnType("uniqueidentifier");
+            entity.HasIndex(e => new { e.TenantId, e.PropertyId }, "IX_Residents_Tenant_Property");
+
+            entity.Property(e => e.Id).ValueGeneratedNever();
+
+            // flattened address record
+            entity.ComplexProperty(p => p.Address, a =>
+            {
+                // This maps C# 'Street' to SQL column 'Address_Street'
+                a.Property(ad => ad.Street).HasMaxLength(200).HasColumnName("Address_Street");
+                a.Property(ad => ad.UnitNumber).HasMaxLength(50).HasColumnName("Address_UnitNumber");
+                a.Property(ad => ad.City).HasMaxLength(100).HasColumnName("Address_City");
+                a.Property(ad => ad.State).HasMaxLength(50).HasColumnName("Address_State");
+                a.Property(ad => ad.ZipCode).HasMaxLength(20).HasColumnName("Address_ZipCode");
+            });
+            //entity.Property(e => e.CreatedBy).HasMaxLength(100);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.Email).HasMaxLength(255);
+            entity.Property(e => e.FirstName).HasMaxLength(100);
+            entity.Property(e => e.LastName).HasMaxLength(100);
+            entity.Property(e => e.Phone).HasMaxLength(50);
+            entity.Property(e => e.RentAmount).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.RowVersion)
+                .IsRowVersion()
+                .IsConcurrencyToken();
+            //entity.Property(e => e.UpdatedBy).HasMaxLength(100);
+
+            entity.HasOne(d => d.Property).WithMany(p => p.Residents)
+                .HasForeignKey(d => d.PropertyId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Residents_Properties");
+
+            entity.HasOne(d => d.Unit).WithMany(p => p.Residents)
+                .HasForeignKey(d => d.UnitId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Residents_Units");
+        });
+
 
         modelBuilder.Entity<Tenant>(entity =>
         {
@@ -242,7 +344,19 @@ public partial class ApplicationDbContext : DbContext
             entity.HasIndex(e => e.TenantId, "IX_Units_Tenant_Active").HasFilter("([IsDeleted]=(0))");
 
             entity.Property(e => e.Id).ValueGeneratedNever();
+            // flattened address record
+            entity.ComplexProperty(p => p.Address, a =>
+            {
+                // This maps C# 'Street' to SQL column 'Address_Street'
+                a.Property(ad => ad.Street).HasMaxLength(200).HasColumnName("Address_Street");
+                a.Property(ad => ad.UnitNumber).HasMaxLength(50).HasColumnName("Address_UnitNumber");
+                a.Property(ad => ad.City).HasMaxLength(100).HasColumnName("Address_City");
+                a.Property(ad => ad.State).HasMaxLength(50).HasColumnName("Address_State");
+                a.Property(ad => ad.ZipCode).HasMaxLength(20).HasColumnName("Address_ZipCode");
+            });
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.Name).HasMaxLength(200);
             entity.Property(e => e.Rent).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.RowVersion)
                 .IsRowVersion()

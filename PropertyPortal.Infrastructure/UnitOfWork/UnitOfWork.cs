@@ -24,6 +24,9 @@ namespace PropertyPortal.Infrastructure.UnitOfWork
         public IBaseRepository<Property> Properties => new BaseRepository<Property>(_context, _tenantProvider);
         public IBaseRepository<Unit> Units => new BaseRepository<Unit>(_context, _tenantProvider);
         public IBaseRepository<Lease> Leases => new BaseRepository<Lease>(_context, _tenantProvider);
+        public IBaseRepository<Resident> Residents => new BaseRepository<Resident>(_context, _tenantProvider);
+        // Initialize the join table repository
+        public IBaseRepository<PropertyManager> PropertyManagers => new BaseRepository<PropertyManager>(_context, _tenantProvider);
 
         public async Task<int> CompleteAsync()
         {

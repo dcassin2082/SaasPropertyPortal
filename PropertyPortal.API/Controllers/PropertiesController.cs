@@ -1,14 +1,11 @@
 ﻿using Mapster;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using PropertyPortal.Application.Common.Interfaces;
 using PropertyPortal.Application.Common.Models;
 using PropertyPortal.Application.DTOs.Properties;
 using PropertyPortal.Application.Extensions;
-using PropertyPortal.Application.Validators.Properties;
 using PropertyPortal.Domain.Entities;
-using PropertyPortal.Infrastructure.UnitOfWork;
 
 namespace PropertyPortal.API.Controllers
 {

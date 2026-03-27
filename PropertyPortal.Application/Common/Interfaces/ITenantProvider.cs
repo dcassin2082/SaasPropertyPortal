@@ -2,7 +2,7 @@
 {
     public interface ITenantProvider
     {
-        Guid GetTenantId();
+        Guid GetTenantId(); 
         Guid? GetUserId();
     }
 }
