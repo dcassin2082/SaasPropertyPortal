@@ -57,14 +57,20 @@ namespace PropertyPortal.API.Controllers
                 UnitCount = p.Units.Count(),
                 TotalMonthlyRent = p.Units.Sum(u => u.Rent)
             });
-
-            // 3. Pass everything to the Repo (Now handles Sorting + Pagination)
-            return await _uow.Properties.GetPagedAsync(
+            var properties = await _uow.Properties.GetPagedAsync(
                 projectedQuery,
                 pageNumber,
                 pageSize,
                 sortBy,
                 isDescending);
+            return properties;
+            // 3. Pass everything to the Repo (Now handles Sorting + Pagination)
+            //return await _uow.Properties.GetPagedAsync(
+            //    projectedQuery,
+            //    pageNumber,
+            //    pageSize,
+            //    sortBy,
+            //    isDescending);
         }
 
         //// added pagination to GetProperties and added paging

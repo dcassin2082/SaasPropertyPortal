@@ -14,11 +14,11 @@ namespace PropertyPortal.Domain.Entities
     [ComplexType]
     public record Address
     (
-        string Street,
+        string? Street,
         string? UnitNumber,
-        string City,
-        string State,
-        string ZipCode
+        string? City,
+        string? State,
+        string? ZipCode
     );
 
 }

@@ -14,9 +14,9 @@ namespace PropertyPortal.Application.Extensions
 
             return query.Where(p =>
                 p.Name.Contains(searchTerm) ||
-                p.Address.Street.Contains(searchTerm) ||
-                p.Address.City.Contains(searchTerm) ||
-                p.Address.ZipCode.Contains(searchTerm));
+                (p.Address.Street != null && p.Address.Street.Contains(searchTerm)) ||
+                (p.Address.City != null && p.Address.City.Contains(searchTerm)) ||
+                (p.Address.ZipCode != null && p.Address.ZipCode.Contains(searchTerm)));
         }
 
         public static IQueryable<T> ApplySearch<T>(this IQueryable<T> query, string? term) where T : class, ILocatable
@@ -27,10 +27,10 @@ namespace PropertyPortal.Application.Extensions
 
             return query.Where(x =>
                 x.Name.Contains(term) ||
-                x.Address.Street.Contains(term) ||
-                x.Address.City.Contains(term) ||
-                x.Address.ZipCode.Contains(term) ||
-                x.Description != null && x.Description.Contains(term));
+                 (x.Address.Street != null && x.Address.Street.Contains(term)) ||
+                 (x.Address.City != null && x.Address.City.Contains(term)) ||
+                 (x.Address.ZipCode != null && x.Address.ZipCode.Contains(term)) ||
+                  x.Description != null && x.Description.Contains(term));
         }
 
     }

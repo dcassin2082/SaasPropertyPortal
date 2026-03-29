@@ -19,7 +19,14 @@ namespace PropertyPortal.Infrastructure.UnitOfWork
             _tenantProvider = tenantProvider;
         }
 
-        public IBaseRepository<User> Users => new BaseRepository<User>(_context, _tenantProvider);
+        public IBaseRepository<User> Users
+        {
+            get
+            {
+                return new BaseRepository<User>(_context, _tenantProvider);
+            }
+        }
+
         public IBaseRepository<Tenant> Tenants => new BaseRepository<Tenant>(_context, _tenantProvider);
         public IBaseRepository<Property> Properties => new BaseRepository<Property>(_context, _tenantProvider);
         public IBaseRepository<Unit> Units => new BaseRepository<Unit>(_context, _tenantProvider);
