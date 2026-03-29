@@ -14,6 +14,7 @@ namespace PropertyPortal.API.Controllers
     [ApiController]
     public class PropertiesController : ApiBaseController
     {
+        // properties controller
         //private readonly ApplicationDbContext _context;
         //private readonly PropertyRepository _propertyRepo;
         //private readonly IBaseRepository<Property> _propertyRepo;
