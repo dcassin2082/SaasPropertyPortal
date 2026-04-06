@@ -1,0 +1,9 @@
+﻿namespace PropertyPortal.Application.DTOs.Properties
+{
+    public class PropertyLookupDto
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; }
+        public int ResidentCount { get; set; }
+    }
+}

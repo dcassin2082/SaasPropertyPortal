@@ -21,27 +21,83 @@ namespace PropertyPortal.API.Controllers
         }
 
         // GET: api/Units
+        //[HttpGet]
+        //public async Task<ActionResult<IEnumerable<UnitResponseDto>>> GetUnits()
+        //{
+        //    //var units = await _uow.Units.Query().IgnoreQueryFilters().Include(u => u.Property).ToListAsync();
+        //    //return Ok(units.Adapt<List<UnitResponseDto>>());
+        //    var units = await _uow.Units.Query()
+        //.IgnoreQueryFilters()
+        //.Select(u => new UnitResponseDto
+        //{
+        //    Id = u.Id,
+        //    UnitNumber = u.UnitNumber ?? "N/A", // Handle potential nulls
+        //    Rent = u.Rent,
+        //    PropertyId = u.PropertyId,
+        //    PropertyName = u.Property != null ? u.Property.Name : "Unassigned"
+        //})
+        //.ToListAsync();
+
+        //    return Ok(units);
+        //    //// Map the list of Entities to a list of DTOs
+        //    //var response = units.Select(u => new UnitResponseDto
+        //    //{
+        //    //    Id = u.Id,
+        //    //    UnitNumber = u.UnitNumber,
+        //    //    Description = u.Description,
+        //    //    PropertyId = u.PropertyId,
+        //    //    CreatedAt = u.CreatedAt,
+        //    //    Bedrooms = u.Bedrooms.HasValue ? (int)u.Bedrooms : 0,
+        //    //    Bathrooms = u.Bathrooms.HasValue ? (int)u.Bathrooms : 0,
+        //    //    Rent = u.Rent
+        //    //}).ToList();
+
+        //    //return Ok(response);
+        //}
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<UnitResponseDto>>> GetUnits()
+        public async Task<ActionResult<IEnumerable<UnitResponseDto>>> GetUnits([FromQuery] Guid? propertyId)
         {
-            var units = await _uow.Units.Query().IgnoreQueryFilters().Include(u => u.Property).ToListAsync();
-            return Ok(units.Adapt<List<UnitResponseDto>>());
+            // Filter by propertyId if it exists, otherwise keep it empty for safety
+            if (!propertyId.HasValue) return Ok(new List<UnitResponseDto>());
 
-            //// Map the list of Entities to a list of DTOs
-            //var response = units.Select(u => new UnitResponseDto
-            //{
-            //    Id = u.Id,
-            //    UnitNumber = u.UnitNumber,
-            //    Description = u.Description,
-            //    PropertyId = u.PropertyId,
-            //    CreatedAt = u.CreatedAt,
-            //    Bedrooms = u.Bedrooms.HasValue ? (int)u.Bedrooms : 0,
-            //    Bathrooms = u.Bathrooms.HasValue ? (int)u.Bathrooms : 0,
-            //    Rent = u.Rent
-            //}).ToList();
+            var units = await _uow.Units.Query()
+                .Where(u => u.PropertyId == propertyId.Value)
+                .Select(u => new UnitResponseDto
+                {
+                    Id = u.Id,
+                    UnitNumber = u.UnitNumber,
+                    Description = u.Description,
+                    Bedrooms = u.Bedrooms,   // SQL Nulls map to int? perfectly here
+                    Bathrooms = u.Bathrooms, // SQL Nulls map to int? perfectly here
+                    Rent = u.Rent,
+                    CreatedAt = u.CreatedAt,
+                    PropertyId = u.PropertyId,
+                    PropertyName = u.Property.Name
+                })
+                .ToListAsync();
 
-            //return Ok(response);
+            return Ok(units);
         }
+        //[HttpGet]
+        //public async Task<ActionResult<IEnumerable<UnitResponseDto>>> GetUnits([FromQuery] Guid? propertyId)
+        //{
+        //    var query = _uow.Units.Query();
+
+        //    if (propertyId.HasValue)
+        //    {
+        //        query = query.Where(u => u.PropertyId == propertyId.Value);
+        //    }
+
+        //    var units = await query
+        //        .Select(u => new UnitResponseDto
+        //        {
+        //            Id = u.Id,
+        //            UnitNumber = u.UnitNumber
+        //        })
+        //        .ToListAsync();
+
+        //    return Ok(units);
+        //}
 
         // GET: api/Units/5
         [HttpGet("{id}")]

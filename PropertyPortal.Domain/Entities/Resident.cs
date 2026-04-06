@@ -32,6 +32,5 @@ namespace PropertyPortal.Domain.Entities
         public string Name { get; set; } = null!;
         public string? Description { get; set; }
         // Map existing fields to the interface requirements
-
     }
 }

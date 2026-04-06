@@ -33,5 +33,19 @@ namespace PropertyPortal.Application.Extensions
                   x.Description != null && x.Description.Contains(term));
         }
 
+        public static IQueryable<T> ApplyResidentSearch<T>(this IQueryable<T> query, string? term) where T : Resident, ILocatable
+        {
+            if (string.IsNullOrWhiteSpace(term)) return query;
+
+            term = term.Trim();
+            return query.Where(x =>
+                x.FirstName.Contains(term) ||
+                x.LastName.Contains(term) ||
+                x.Name.Contains(term) ||
+                 (x.Address.Street != null && x.Address.Street.Contains(term)) ||
+                 (x.Address.City != null && x.Address.City.Contains(term)) ||
+                 (x.Address.ZipCode != null && x.Address.ZipCode.Contains(term)) ||
+                  x.Description != null && x.Description.Contains(term));
+        }
     }
 }

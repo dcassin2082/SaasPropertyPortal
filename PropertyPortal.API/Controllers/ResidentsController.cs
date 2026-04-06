@@ -2,10 +2,12 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PropertyPortal.Application.Common.Interfaces;
+using PropertyPortal.Application.DTOs.Properties;
 using PropertyPortal.Application.DTOs.Residents;
 using PropertyPortal.Application.Extensions;
 using PropertyPortal.Domain.Entities;
 using System.Security.Claims;
+using System.Text;
 
 [Route("api/[controller]")]
 [ApiController]
@@ -18,43 +20,223 @@ public class ResidentsController : ControllerBase
         _uow = uow;
         _tenantProvider = tenantProvider;
     }
-
+   
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<ResidentResponseDto>>> GetResidents([FromQuery] string? search = null)
+    public async Task<ActionResult<ResidentListResponse>> GetResidents(
+    [FromQuery] string? search = null,
+    [FromQuery] Guid? propertyId = null,
+    [FromQuery] string? status = null)
     {
         var userId = _tenantProvider.GetUserId() ?? Guid.Parse("3D91A36C-F52C-45B2-8B47-67B87303640A");
-        var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Manager";
+        var now = DateTime.UtcNow;
 
-        //// 1. Check if the PropertyManager record is visible to EF
-        //var managerLinkExists = await _uow.PropertyManagers.Query()
-        //    .IgnoreQueryFilters() // Bypass Tenant filters for a second
-        //    .AnyAsync(pm => pm.PropertyId == Guid.Parse("10AE7067-6F7E-48CE-B4BF-38EBBFE618C3")
-        //                 && pm.UserId == userId);
+        // 1. Get the list of Property IDs this user is allowed to manage FIRST
+        List<Guid> allowedPropertyIds = await GetManagedPropertyIdsAsync(userId);
+        // 2. Start the resident query using the pre-fetched IDs
+        var query = _uow.Residents.Query()
+            .IgnoreQueryFilters()
+            .Where(r => allowedPropertyIds.Contains(r.PropertyId));
 
-        //Console.WriteLine($"Manager Link Visible: {managerLinkExists}");
-
-        // ignoring query filters on both returned the results
-        //var query = _uow.Residents.Query().Include(r => r.Property).AsQueryable();
-        var query = _uow.Residents.Query().IgnoreQueryFilters().Include(r => r.Property).AsQueryable();
-
-        // Use a simpler join for debugging
-        query = query.Where(r => _uow.PropertyManagers.Query()
-            //.IgnoreQueryFilters()
-            .Any(pm => pm.PropertyId == r.PropertyId && pm.UserId == userId));
-
-
-        if (userRole == "Manager")
-        {
-            query = query.Where(r => _uow.PropertyManagers.Query().Any(pm => pm.PropertyId == r.PropertyId && pm.UserId == userId));
-        }
-        query = query.ApplySearch(search);
-
+        //// Start with a base query of residents the manager is allowed to see
         //var query = _uow.Residents.Query()
-        //    .Include(r => r.Property)
-        //    .ApplySearch(search); // Reuse your global search logic!
+        //    .IgnoreQueryFilters()
+        //    .Where(r => _uow.PropertyManagers.Query()
+        //        .Any(pm => pm.PropertyId == r.PropertyId && pm.UserId == userId));
 
-        var residents = await query.ToListAsync();
-        return Ok(residents.Adapt<List<ResidentResponseDto>>());
+        // If a specific property is selected in the dropdown, filter by it
+        if (propertyId.HasValue && propertyId.Value != Guid.Empty)
+        {
+            query = query.Where(r => r.PropertyId == propertyId.Value);
+        }
+
+        // 2. Filter by Status (Lease Date Logic)
+        if (!string.IsNullOrEmpty(status))
+        {
+            query = status.ToLower() switch
+            {
+                "active" => query.Where(r => r.LeaseStartDate <= DateOnly.FromDateTime(now) && r.LeaseEndDate >= DateOnly.FromDateTime(now)),
+                "upcoming" => query.Where(r => r.LeaseStartDate > DateOnly.FromDateTime(now)),
+                "past" => query.Where(r => r.LeaseEndDate < DateOnly.FromDateTime(now)),
+                _ => query
+            };
+        }
+        query = query.ApplyResidentSearch(search);
+
+        var residents = await query
+            .Include(r => r.Unit)
+            .Include(r => r.Property)
+            .ToListAsync();
+
+        return Ok(new ResidentListResponse
+        {
+            Residents = residents.Adapt<List<ResidentResponseDto>>(),
+            TotalCount = residents.Count,
+            TotalMonthlyRent = residents.Where(r => !r.IsDeleted).Sum(r => r.RentAmount)
+        });
+    }
+
+    [HttpGet("revenue-trends")]
+    public async Task<ActionResult<IEnumerable<object>>> GetRevenueTrends()
+    {
+        var userId = _tenantProvider.GetUserId() ?? Guid.Parse("3D91A36C-F52C-45B2-8B47-67B87303640A");
+
+        // Use DateOnly for comparison to match your Residents model properties
+        var now = DateOnly.FromDateTime(DateTime.UtcNow);
+        var sixMonthsAgo = now.AddMonths(-6);
+
+        // 1. Define the base filtered query
+        var baseQuery = _uow.Residents.Query()
+            .IgnoreQueryFilters()
+            .Where(r => _uow.PropertyManagers.Query()
+                .Any(pm => pm.PropertyId == r.PropertyId && pm.UserId == userId));
+
+        // 2. Filter and Group
+        var trends = await baseQuery
+            .Where(r => r.LeaseStartDate <= now && r.LeaseEndDate >= sixMonthsAgo && !r.IsDeleted)
+            // Grouping by Year and Month for chronological order
+            .GroupBy(r => new { r.LeaseStartDate.Year, r.LeaseStartDate.Month })
+            .Select(g => new
+            {
+                Year = g.Key.Year,
+                Month = g.Key.Month,
+                Revenue = g.Sum(r => r.RentAmount),
+                Projected = g.Sum(r => r.RentAmount) * 1.1m
+            })
+            .ToListAsync();
+
+        // 3. Final formatting for the Chart (handled in memory for clean string labels)
+        var formattedTrends = trends
+            .OrderBy(t => t.Year)
+            .ThenBy(t => t.Month)
+            .Select(t => new
+            {
+                Month = $"{t.Month}/{t.Year}", // "4/2026"
+                Revenue = t.Revenue,
+                Projected = t.Projected
+            });
+
+        return Ok(formattedTrends);
+    }
+
+    //[HttpGet]
+    //public async Task<ActionResult<IEnumerable<ResidentResponseDto>>> GetResidents([FromQuery] string? search = null)
+    //{
+    //    var userId = _tenantProvider.GetUserId() ?? Guid.Parse("3D91A36C-F52C-45B2-8B47-67B87303640A");
+    //    var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Manager";
+
+    //    var query = _uow.Residents.Query().IgnoreQueryFilters().Include(r => r.Property).AsQueryable();
+
+    //    // Use a simpler join for debugging
+    //    query = query.Where(r => _uow.PropertyManagers.Query()
+    //        //.IgnoreQueryFilters()
+    //        .Any(pm => pm.PropertyId == r.PropertyId && pm.UserId == userId));
+
+
+    //    if (userRole == "Manager")
+    //    {
+    //        query = query.Where(r => _uow.PropertyManagers.Query().Any(pm => pm.PropertyId == r.PropertyId && pm.UserId == userId));
+    //    }
+    //    query = query.ApplySearch(search);
+
+    //    var residents = await query.Include(r => r.Unit).ThenInclude(u => u.Property).ToListAsync();
+
+    //    var response = new ResidentListResponse
+    //    {
+    //        Residents = residents.Adapt<List<ResidentResponseDto>>(),
+    //        TotalCount = residents.Count(),
+    //        TotalMonthlyRent = residents.Sum(r => r.RentAmount)
+    //    };
+
+    //    return Ok(response);
+
+    //    //return Ok(residents.Adapt<List<ResidentResponseDto>>());
+    //}
+
+    [HttpGet("export")]
+    public async Task<IActionResult> ExportResidents(
+        [FromQuery] string? search = null,
+        [FromQuery] Guid? propertyId = null,
+        [FromQuery] string? status = null)
+    {
+        var userId = _tenantProvider.GetUserId() ?? Guid.Parse("3D91A36C-F52C-45B2-8B47-67B87303640A");
+        var now = DateTime.UtcNow;
+
+        // Use the SAME filtering logic as your GetResidents method
+        var query = _uow.Residents.Query()
+            .IgnoreQueryFilters()
+            .Where(r => _uow.PropertyManagers.Query()
+                .Any(pm => pm.PropertyId == r.PropertyId && pm.UserId == userId));
+
+        if (propertyId.HasValue && propertyId.Value != Guid.Empty)
+            query = query.Where(r => r.PropertyId == propertyId.Value);
+
+        if (!string.IsNullOrEmpty(status))
+        {
+            query = status.ToLower() switch
+            {
+                "active" => query.Where(r => r.LeaseStartDate <= DateOnly.FromDateTime(now) && r.LeaseEndDate >= DateOnly.FromDateTime(now)),
+                "upcoming" => query.Where(r => r.LeaseStartDate > DateOnly.FromDateTime(now)),
+                "past" => query.Where(r => r.LeaseEndDate < DateOnly.FromDateTime(now)),
+                _ => query
+            };
+        }
+
+        var residents = await query.Include(r => r.Property).ToListAsync();
+
+        // Generate CSV String
+        var csv = new StringBuilder();
+        csv.AppendLine("FirstName,LastName,Property,RentAmount,LeaseEnd");
+
+        foreach (var r in residents)
+        {
+            csv.AppendLine($"{r.FirstName},{r.LastName},{r.Property.Name},{r.RentAmount},{r.LeaseEndDate:yyyy-MM-dd}");
+        }
+
+        var bytes = Encoding.UTF8.GetBytes(csv.ToString());
+        return File(bytes, "text/csv", $"Residents_{DateTime.Now:yyyyMMdd}.csv");
+    }
+
+    [HttpPost("bulk-renew")]
+    public async Task<IActionResult> BulkRenewLeases([FromBody] BulkRenewalRequest request)
+    {
+        var userId = _tenantProvider.GetUserId();
+
+        // 1. Fetch only residents that belong to this manager
+        var residents = await _uow.Residents.Query()
+            .Where(r => request.ResidentIds.Contains(r.Id))
+            .Where(r => _uow.PropertyManagers.Query()
+                .Any(pm => pm.PropertyId == r.PropertyId && pm.UserId == userId))
+            .ToListAsync();
+
+        foreach (var resident in residents)
+        {
+            // 2. Apply Rent Logic
+            if (request.PercentIncrease.HasValue)
+                resident.RentAmount *= (decimal)(1 + (request.PercentIncrease.Value / 100));
+            else if (request.NewRentAmount.HasValue)
+                resident.RentAmount = request.NewRentAmount.Value;
+
+            // 3. Apply Date Logic
+            resident.LeaseStartDate = DateOnly.FromDateTime(DateTime.UtcNow);
+            resident.LeaseEndDate = DateOnly.FromDateTime(request.NewEndDate);
+            await _uow.Residents.PutAsync(resident.Id, resident);
+        }
+
+        await _uow.CompleteAsync();
+        return Ok(new { Count = residents.Count });
+    }
+
+    [HttpPost("bulk-notice")]
+    public async Task<IActionResult> SendBulkNotice([FromBody] BulkNoticeRequest request)
+    {
+        // request.ResidentIds will be your selectedIds array
+        // request.MessageTemplate would be "LeaseRenewal" etc.
+
+        // 1. Fetch the residents by the list of IDs
+        // 2. Filter them again by UserId to ensure security (don't trust the client!)
+        // 3. Trigger your Email/Notification service
+
+        return Ok(new { Message = $"Sent notices to {request.ResidentIds.Count} residents." });
     }
 
     [HttpGet("{id}")]
@@ -128,5 +310,13 @@ public class ResidentsController : ControllerBase
         await _uow.Residents.DeleteAsync(id);
         await _uow.CompleteAsync();
         return NoContent();
+    }
+
+    private async Task<List<Guid>> GetManagedPropertyIdsAsync(Guid userId)
+    {
+        return await _uow.PropertyManagers.Query()
+            .Where(pm => pm.UserId == userId)
+            .Select(pm => pm.PropertyId)
+            .ToListAsync();
     }
 }

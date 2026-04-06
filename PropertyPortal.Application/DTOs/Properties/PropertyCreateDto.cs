@@ -16,5 +16,6 @@ namespace PropertyPortal.Application.DTOs.Properties
 
         [StringLength(50)]
         public string? PropertyType { get; set; }
+
     }
 }

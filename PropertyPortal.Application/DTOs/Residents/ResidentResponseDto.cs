@@ -15,6 +15,7 @@ namespace PropertyPortal.Application.DTOs.Residents
         DateOnly LeaseStartDate,
         DateOnly LeaseEndDate,
         decimal RentAmount,
-        Address Address
+        Address Address,
+        string UnitNumber
     );
 }

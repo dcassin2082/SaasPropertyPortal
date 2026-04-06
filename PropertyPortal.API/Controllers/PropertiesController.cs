@@ -1,11 +1,13 @@
 ﻿using Mapster;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using PropertyPortal.Application.Common.Interfaces;
 using PropertyPortal.Application.Common.Models;
 using PropertyPortal.Application.DTOs.Properties;
 using PropertyPortal.Application.Extensions;
 using PropertyPortal.Domain.Entities;
+using System.Text;
 
 namespace PropertyPortal.API.Controllers
 {
@@ -19,10 +21,34 @@ namespace PropertyPortal.API.Controllers
         //private readonly PropertyRepository _propertyRepo;
         //private readonly IBaseRepository<Property> _propertyRepo;
         private readonly IUnitOfWork _uow;
+        private readonly ITenantProvider _tenantProvider;
 
-        public PropertiesController(IUnitOfWork uow)
+        public PropertiesController(IUnitOfWork uow, ITenantProvider tenantProvider)
         {
             _uow = uow;
+            _tenantProvider = tenantProvider;
+        }
+
+        [HttpGet("lookup")]
+        public async Task<ActionResult<IEnumerable<PropertyLookupDto>>> GetPropertyLookup()
+        {
+            var userId = _tenantProvider.GetUserId();
+
+            // Get only properties assigned to this manager
+            var properties = await _uow.PropertyManagers.Query()
+                //.IgnoreQueryFilters()
+                .Where(pm => pm.UserId == userId)
+                .Select(pm => new PropertyLookupDto
+                {
+                    Id = pm.PropertyId,
+                    Name = pm.Property.Name,
+                    ResidentCount = _uow.Residents.Query().IgnoreQueryFilters().Count(r => r.PropertyId == pm.PropertyId)
+                })
+                .Distinct()
+                .OrderBy(p => p.Name)
+                .ToListAsync();
+
+            return Ok(properties);
         }
 
         // added pagination to GetProperties & then added sorting
@@ -38,6 +64,9 @@ namespace PropertyPortal.API.Controllers
 
             // 1. Get the Queryable (Tenant filtering applied automatically)
             var query = _uow.Properties.Query().ApplySearch(search);
+
+            //// remove this and let the select do the work
+            //query = query.Include(u => u.Units).Include(r => r.Residents);
 
             //// TEST ONLY: Does this work? if this works the problem was in how Mapster was projecting
             //var rawProperties = await query.ToListAsync();
@@ -56,7 +85,8 @@ namespace PropertyPortal.API.Controllers
                 Description = p.Description,
                 // Calculate the aggregates here or keep them in Mapster if you prefer
                 UnitCount = p.Units.Count(),
-                TotalMonthlyRent = p.Units.Sum(u => u.Rent)
+                ResidentCount = p.Residents.Count(),
+                TotalMonthlyRent = p.Units.Where(u => !u.IsDeleted).Sum(u => u.Rent)
             });
             var properties = await _uow.Properties.GetPagedAsync(
                 projectedQuery,
@@ -65,13 +95,6 @@ namespace PropertyPortal.API.Controllers
                 sortBy,
                 isDescending);
             return properties;
-            // 3. Pass everything to the Repo (Now handles Sorting + Pagination)
-            //return await _uow.Properties.GetPagedAsync(
-            //    projectedQuery,
-            //    pageNumber,
-            //    pageSize,
-            //    sortBy,
-            //    isDescending);
         }
 
         //// added pagination to GetProperties and added paging

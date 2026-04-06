@@ -4,6 +4,7 @@ using Microsoft.IdentityModel.Tokens;
 using PropertyPortal.Application.Common.Interfaces;
 using PropertyPortal.Application.DTOs.Auth;
 using PropertyPortal.Domain.Entities;
+using PropertyPortal.Infrastructure.Data;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -74,6 +75,7 @@ namespace PropertyPortal.API.Controllers
             // CompleteAsync ensures both succeed or both fail (Atomicity)
             await _uow.CompleteAsync();
 
+            return Ok(new { message = "Registration successful", tenant.Id });
         }
 
         private string GenerateJwtToken(User user)
@@ -102,3 +104,76 @@ namespace PropertyPortal.API.Controllers
         }
     }
 }
+
+
+//using var transaction = await _context.Database.BeginTransactionAsync();
+
+//try
+//{
+//    var tenantId = Guid.NewGuid();
+
+//    // 1. Create and Save Tenant first
+//    var tenant = new Tenant
+//    {
+//        Id = tenantId,
+//        Name = dto.CompanyName,
+//        CreatedBy = Guid.Empty
+//    };
+//    _context.Tenants.Add(tenant);
+//    await _context.SaveChangesAsync(); // Forces Tenant into DB inside transaction
+
+//    // 2. IMPORTANT: Clear the tracker
+//    // This stops EF from trying to "re-save" the Tenant or manage its relationship
+//    _context.ChangeTracker.Clear();
+//    var adminUser = new User
+//    {
+//        Id = Guid.NewGuid(),
+//        TenantId = tenantId,
+//        Email = dto.AdminEmail,
+//        PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
+//        Role = "Admin",
+//        CreatedBy = Guid.Empty
+//    };
+//    _context.Users.Add(adminUser);
+//    await _context.SaveChangesAsync(); // Forces User into DB
+
+//    // 3. Commit the whole thing
+//    await transaction.CommitAsync();
+
+
+//}
+//catch (Exception ex)
+//{
+//    await transaction.RollbackAsync();
+//    return BadRequest(new { error = ex.Message });
+//}
+//// 1. Create the Tenant
+//var tenant = new Tenant
+//{
+//    Id = Guid.NewGuid(),
+//    Name = dto.CompanyName,
+//    CreatedBy = Guid.Empty,
+//    Users = new List<User>() // Initialize the collection
+//};
+
+//// 2. Create the Admin User (Don't set TenantId or Tenant property here)
+//var adminUser = new User
+//{
+//    Id = Guid.NewGuid(),
+//    Email = dto.AdminEmail,
+//    PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
+//    Role = "Admin",
+//    CreatedBy = Guid.Empty
+//};
+
+//// 3. Add User to the Tenant's collection
+//tenant.Users.Add(adminUser);
+
+//// 4. CRITICAL: Only Post the Tenant
+//// EF Core will traverse the 'Users' collection and discover 'adminUser'
+//await _uow.Tenants.PostAsync(tenant);
+
+//// 5. Complete once
+//await _uow.CompleteAsync();
+
+//return Ok(new { message = "Registration successful", tenantId = tenant.Id });

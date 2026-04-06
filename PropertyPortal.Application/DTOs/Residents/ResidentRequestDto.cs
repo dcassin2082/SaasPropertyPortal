@@ -4,6 +4,7 @@ using PropertyPortal.Domain.Entities;
 namespace PropertyPortal.Application.DTOs.Residents
 {
     public record ResidentRequestDto(
+        Guid TenantId,
         Guid PropertyId,
         Guid UnitId,
         string FirstName,

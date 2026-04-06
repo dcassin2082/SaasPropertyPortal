@@ -23,6 +23,8 @@ namespace PropertyPortal.Application.DTOs.Properties
 
         // Calculated Fields (mapping performed in Program.cs ... TypeAdapterConfig(Property, PropertyResponseDto> ...
         public int UnitCount { get; set; }
+        
+        public int ResidentCount { get; set; }
 
         public decimal TotalMonthlyRent { get; set; }
 

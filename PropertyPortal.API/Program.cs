@@ -9,6 +9,7 @@ using PropertyPortal.API.Filters;
 using PropertyPortal.Application.Common.Interfaces;
 using PropertyPortal.Application.DTOs.Properties;
 using PropertyPortal.Application.DTOs.Residents;
+using PropertyPortal.Application.DTOs.Units;
 using PropertyPortal.Application.Validators.Properties;
 using PropertyPortal.Domain.Entities;
 using PropertyPortal.Infrastructure.Data;
@@ -18,6 +19,7 @@ using PropertyPortal.Infrastructure.Repositories;
 using PropertyPortal.Infrastructure.Tenancy;
 using PropertyPortal.Infrastructure.UnitOfWork;
 using PropertyPortal.Infrastructure.Web.Filters;
+using Scalar.AspNetCore;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 
@@ -26,8 +28,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddDbContext<ApplicationDbContext>((sp, options) =>
 {
-    options.UseSqlServer(builder.Configuration.GetConnectionString("LocalPropertyPortalConnection"))
+    options.UseSqlServer(builder.Configuration.GetConnectionString("LocalPropertyPortalConnection"), sqlOptions => sqlOptions.CommandTimeout(60))
            .AddInterceptors(sp.GetRequiredService<AuditInterceptor>());
+
 });
 
 /* **********************************************************************************************/
@@ -56,14 +59,19 @@ TypeAdapterConfig<Property, PropertyResponseDto>
 
 TypeAdapterConfig<Resident, ResidentResponseDto>
     .NewConfig()
+    .Map(dest => dest.UnitNumber, src => src.Unit.UnitNumber)
     // Explicitly map the Address complex type
     .Map(dest => dest.Address, src => src.Address)
     // Flatten the Property Name from the navigation property
     .Map(dest => dest.PropertyName, src => src.Property != null ? src.Property.Name : "Unassigned");
 
+
 TypeAdapterConfig<ResidentRequestDto, Resident>
     .NewConfig()
     .Map(dest => dest.Address, src => src.Address);
+
+TypeAdapterConfig<Unit, UnitResponseDto>.NewConfig()
+    .Map(dest => dest.PropertyName, src => src.Property.Name);
 
 /*************************************************************************************************/
 
@@ -114,7 +122,12 @@ app.UseCors(builder => builder.AllowAnyMethod().AllowAnyHeader().AllowAnyOrigin(
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
+    // Map the OpenAPI endpoint
     app.MapOpenApi();
+    // Map the Scalar API reference UI
+    app.MapScalarApiReference();
+    // Optional: Redirect the root URL to the Scalar UI
+    app.MapGet("/", () => Results.Redirect("/scalar/v1"));
 }
 
 app.UseHttpsRedirection();

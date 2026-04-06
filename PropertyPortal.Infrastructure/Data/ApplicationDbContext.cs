@@ -32,7 +32,8 @@ public partial class ApplicationDbContext : DbContext
     public virtual DbSet<User> Users { get; set; }
 
     public virtual DbSet<Resident> Residents { get; set; }
-    /*  */
+    
+    public virtual DbSet<ResidentNote> ResidentNotes { get; set; }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
@@ -44,7 +45,10 @@ public partial class ApplicationDbContext : DbContext
             {
                 case EntityState.Added:
                     // Force the TenantId on creation
-                    entry.Entity.TenantId = tenantId;
+                    if(entry.Entity.TenantId == Guid.Empty && tenantId != Guid.Empty)
+                    {
+                        entry.Entity.TenantId = tenantId;
+                    }
                     entry.Entity.CreatedAt = DateTime.UtcNow;
                     break;
 
@@ -316,6 +320,17 @@ public partial class ApplicationDbContext : DbContext
                 .HasConstraintName("FK_Residents_Units");
         });
 
+        modelBuilder.Entity<ResidentNote>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_ResidentNote");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.Property(e => e.Content).HasDefaultValue("");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.RowVersion)
+                .IsRowVersion()
+                .IsConcurrencyToken();
+        });
 
         modelBuilder.Entity<Tenant>(entity =>
         {
