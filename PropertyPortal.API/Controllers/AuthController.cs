@@ -74,7 +74,6 @@ namespace PropertyPortal.API.Controllers
             // CompleteAsync ensures both succeed or both fail (Atomicity)
             await _uow.CompleteAsync();
 
-            return Ok(new { message = "Registration successful", tenantId = tenant.Id });
         }
 
         private string GenerateJwtToken(User user)
