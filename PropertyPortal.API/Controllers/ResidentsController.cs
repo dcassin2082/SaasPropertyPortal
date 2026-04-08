@@ -20,7 +20,7 @@ public class ResidentsController : ControllerBase
         _uow = uow;
         _tenantProvider = tenantProvider;
     }
-   
+
     [HttpGet]
     public async Task<ActionResult<ResidentListResponse>> GetResidents(
     [FromQuery] string? search = null,
@@ -61,15 +61,39 @@ public class ResidentsController : ControllerBase
             };
         }
         query = query.ApplyResidentSearch(search);
+        /*System.Data.SqlTypes.SqlNullValueException: 'Data is Null. This method or property cannot be called on Null values.'
+            */
+        //var residents = await query
+        //    .Include(r => r.Unit)
+        //    .Include(r => r.Property)
+        //    .ToListAsync();
 
         var residents = await query
-            .Include(r => r.Unit)
-            .Include(r => r.Property)
-            .ToListAsync();
-
+        .Select(r => new ResidentResponseDto(
+        r.Id,
+        r.PropertyId,
+        r.Property != null ? r.Property.Name : "Unassigned",
+        r.UnitId,
+        r.Unit != null ? r.Unit.UnitNumber : "N/A",
+        $"{r.FirstName} {r.LastName}",
+        r.Email,
+        r.Phone,
+        r.LeaseStartDate,
+        r.LeaseEndDate,
+        r.Unit != null ? r.Unit.Rent : 0,
+        r.IsDeleted,
+        // Pull the address from the PROPERTY, not the UNIT
+        r.Property != null
+            ? $"{r.Property.Address.Street}, {r.Property.Address.City}, {r.Property.Address.State}"
+            : "No Address"
+    ))
+    .ToListAsync();
         return Ok(new ResidentListResponse
         {
-            Residents = residents.Adapt<List<ResidentResponseDto>>(),
+            //Residents = residents.Adapt<List<ResidentResponseDto>>(),
+            /*Since you already used .Select(r => new ResidentResponseDto(...)) in your LINQ query, your residents list is already 
+             * a list of DTOs. Calling .Adapt (Mapster) again is redundant and costs extra CPU cycles. You can just do: */
+            Residents = residents, // no need to adapt anything
             TotalCount = residents.Count,
             TotalMonthlyRent = residents.Where(r => !r.IsDeleted).Sum(r => r.RentAmount)
         });
@@ -86,34 +110,34 @@ public class ResidentsController : ControllerBase
 
         // 1. Define the base filtered query
         var baseQuery = _uow.Residents.Query()
-            .IgnoreQueryFilters()
-            .Where(r => _uow.PropertyManagers.Query()
-                .Any(pm => pm.PropertyId == r.PropertyId && pm.UserId == userId));
+        .IgnoreQueryFilters()
+        .Where(r => _uow.PropertyManagers.Query()
+            .Any(pm => pm.PropertyId == r.PropertyId && pm.UserId == userId));
 
         // 2. Filter and Group
         var trends = await baseQuery
-            .Where(r => r.LeaseStartDate <= now && r.LeaseEndDate >= sixMonthsAgo && !r.IsDeleted)
-            // Grouping by Year and Month for chronological order
-            .GroupBy(r => new { r.LeaseStartDate.Year, r.LeaseStartDate.Month })
-            .Select(g => new
-            {
-                Year = g.Key.Year,
-                Month = g.Key.Month,
-                Revenue = g.Sum(r => r.RentAmount),
-                Projected = g.Sum(r => r.RentAmount) * 1.1m
-            })
-            .ToListAsync();
+        .Where(r => r.LeaseStartDate <= now && r.LeaseEndDate >= sixMonthsAgo && !r.IsDeleted)
+        // Grouping by Year and Month for chronological order
+        .GroupBy(r => new { r.LeaseStartDate.Year, r.LeaseStartDate.Month })
+        .Select(g => new
+        {
+            Year = g.Key.Year,
+            Month = g.Key.Month,
+            Revenue = g.Sum(r => r.RentAmount),
+            Projected = g.Sum(r => r.RentAmount) * 1.1m
+        })
+        .ToListAsync();
 
         // 3. Final formatting for the Chart (handled in memory for clean string labels)
         var formattedTrends = trends
-            .OrderBy(t => t.Year)
-            .ThenBy(t => t.Month)
-            .Select(t => new
-            {
-                Month = $"{t.Month}/{t.Year}", // "4/2026"
-                Revenue = t.Revenue,
-                Projected = t.Projected
-            });
+        .OrderBy(t => t.Year)
+        .ThenBy(t => t.Month)
+        .Select(t => new
+        {
+            Month = $"{t.Month}/{t.Year}", // "4/2026"
+            Revenue = t.Revenue,
+            Projected = t.Projected
+        });
 
         return Ok(formattedTrends);
     }
@@ -154,18 +178,18 @@ public class ResidentsController : ControllerBase
 
     [HttpGet("export")]
     public async Task<IActionResult> ExportResidents(
-        [FromQuery] string? search = null,
-        [FromQuery] Guid? propertyId = null,
-        [FromQuery] string? status = null)
+    [FromQuery] string? search = null,
+    [FromQuery] Guid? propertyId = null,
+    [FromQuery] string? status = null)
     {
         var userId = _tenantProvider.GetUserId() ?? Guid.Parse("3D91A36C-F52C-45B2-8B47-67B87303640A");
         var now = DateTime.UtcNow;
 
         // Use the SAME filtering logic as your GetResidents method
         var query = _uow.Residents.Query()
-            .IgnoreQueryFilters()
-            .Where(r => _uow.PropertyManagers.Query()
-                .Any(pm => pm.PropertyId == r.PropertyId && pm.UserId == userId));
+        .IgnoreQueryFilters()
+        .Where(r => _uow.PropertyManagers.Query()
+            .Any(pm => pm.PropertyId == r.PropertyId && pm.UserId == userId));
 
         if (propertyId.HasValue && propertyId.Value != Guid.Empty)
             query = query.Where(r => r.PropertyId == propertyId.Value);
@@ -203,10 +227,10 @@ public class ResidentsController : ControllerBase
 
         // 1. Fetch only residents that belong to this manager
         var residents = await _uow.Residents.Query()
-            .Where(r => request.ResidentIds.Contains(r.Id))
-            .Where(r => _uow.PropertyManagers.Query()
-                .Any(pm => pm.PropertyId == r.PropertyId && pm.UserId == userId))
-            .ToListAsync();
+        .Where(r => request.ResidentIds.Contains(r.Id))
+        .Where(r => _uow.PropertyManagers.Query()
+            .Any(pm => pm.PropertyId == r.PropertyId && pm.UserId == userId))
+        .ToListAsync();
 
         foreach (var resident in residents)
         {
@@ -287,9 +311,9 @@ public class ResidentsController : ControllerBase
     {
         // If this works, the problem is in a field NOT listed here (like RowVersion or CreatedBy)
         var resident = await _uow.Residents.Query().IgnoreQueryFilters()
-            .Where(x => x.Id == id)
-            .Select(x => new { x.FirstName, x.LastName })
-            .FirstOrDefaultAsync();
+        .Where(x => x.Id == id)
+        .Select(x => new { x.FirstName, x.LastName })
+        .FirstOrDefaultAsync();
 
         var existing = await _uow.Residents.GetByIdAsync(id);
         if (existing == null) return NotFound();
@@ -315,8 +339,8 @@ public class ResidentsController : ControllerBase
     private async Task<List<Guid>> GetManagedPropertyIdsAsync(Guid userId)
     {
         return await _uow.PropertyManagers.Query()
-            .Where(pm => pm.UserId == userId)
-            .Select(pm => pm.PropertyId)
-            .ToListAsync();
+        .Where(pm => pm.UserId == userId)
+        .Select(pm => pm.PropertyId)
+        .ToListAsync();
     }
 }

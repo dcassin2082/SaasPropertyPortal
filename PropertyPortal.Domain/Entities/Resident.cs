@@ -23,12 +23,12 @@ namespace PropertyPortal.Domain.Entities
 
         public decimal RentAmount { get; set; }
 
-        public virtual Property Property { get; set; } = null!;
+        public virtual Property? Property { get; set; } 
 
-        public virtual Unit Unit { get; set; } = null!;
+        public virtual Unit? Unit { get; set; }
 
         // ILocatable fields - remember this is for searching (Name = (FirstName + LastName), Description are not really needed on Residents table 
-        public required Address Address { get; set; } // EF will flatten this into Property_Street, etc.
+        public Address Address { get; set; } = null!; // EF will flatten this into Property_Street, etc.
         public string Name { get; set; } = null!;
         public string? Description { get; set; }
         // Map existing fields to the interface requirements

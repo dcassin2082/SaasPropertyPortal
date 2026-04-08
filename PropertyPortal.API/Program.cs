@@ -61,7 +61,7 @@ TypeAdapterConfig<Resident, ResidentResponseDto>
     .NewConfig()
     .Map(dest => dest.UnitNumber, src => src.Unit.UnitNumber)
     // Explicitly map the Address complex type
-    .Map(dest => dest.Address, src => src.Address)
+    //.Map(dest => dest.Address, src => src.Address)
     // Flatten the Property Name from the navigation property
     .Map(dest => dest.PropertyName, src => src.Property != null ? src.Property.Name : "Unassigned");
 

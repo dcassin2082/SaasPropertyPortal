@@ -3,7 +3,7 @@ using PropertyPortal.Domain.Common;
 
 namespace PropertyPortal.Domain.Entities;
 
-public partial class Unit : BaseEntity, ILocatable
+public partial class Unit : BaseEntity
 {
     public Guid PropertyId { get; set; }
 
@@ -26,7 +26,10 @@ public partial class Unit : BaseEntity, ILocatable
     public virtual Tenant Tenant { get; set; } = null!;
 
     // from ILocatable interface
-    public string Name { get; set; } = null!;
-    public required Address Address { get; set; } // EF will flatten this into Property_Street, etc.
+    //public string Name { get; set; } = null!;
+    public Address Address { get; set; } = null!; // EF will flatten this into Property_Street, etc.
     public string? Description { get; set; }
+    public string UnitType { get; set; } = null!;
+    public string Status { get; set; } = null!;
+
 }

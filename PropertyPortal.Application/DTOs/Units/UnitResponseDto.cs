@@ -15,5 +15,7 @@ namespace PropertyPortal.Application.DTOs.Units
         public string? PropertyName { get; set; }
         public Guid PropertyId { get; set; }
         public DateTime CreatedAt { get; set; }
+        public bool IsOccupied { get; set; }
+        public string? TenantName { get; set;  }
     }
 }

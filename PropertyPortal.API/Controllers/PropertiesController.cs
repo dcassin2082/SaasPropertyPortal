@@ -1,4 +1,5 @@
-﻿using Mapster;
+﻿using Humanizer;
+using Mapster;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -128,15 +129,60 @@ namespace PropertyPortal.API.Controllers
         //    return Ok(properties.Adapt<List<PropertyResponseDto>>());
         //}
 
+        [HttpGet("{id}/stats")]
+        public async Task<ActionResult<PropertyStatsDto>> GetPropertyStats(Guid id)
+        {
+            // 1. Fetch units and their occupancy status in one go
+            var unitData = await _uow.Units.Query()
+                .Where(u => u.PropertyId == id && !u.IsDeleted)
+                .Select(u => new {
+                    u.Rent,
+                    IsOccupied = _uow.Residents.Query().Any(r => r.UnitId == u.Id && !r.IsDeleted)
+                })
+                .ToListAsync();
+
+            if (!unitData.Any()) return Ok(new PropertyStatsDto(id, 0, 0, 0, 0, 0, 0));
+
+            // 2. Calculate metrics
+            var totalUnits = unitData.Count;
+            var occupiedUnits = unitData.Count(u => u.IsOccupied);
+            var potential = unitData.Sum(u => u.Rent);
+            var actual = unitData.Where(u => u.IsOccupied).Sum(u => u.Rent);
+
+            return Ok(new PropertyStatsDto(
+                PropertyId: id,
+                TotalPotentialRevenue: potential,
+                ActualMonthlyRevenue: actual,
+                OccupancyRate: Math.Round((double)occupiedUnits / totalUnits * 100, 1),
+                TotalUnits: totalUnits,
+                OccupiedUnits: occupiedUnits,
+                AverageRent: totalUnits > 0 ? potential / totalUnits : 0
+            ));
+        }
 
         [HttpGet("{id}")]
         public async Task<ActionResult<PropertyResponseDto>> GetProperty(Guid id)
         {
-            var property = await _uow.Properties.GetByIdAsync(id);
+            var property = await _uow.Properties.Query().Include(p => p.Units)
+                .FirstOrDefaultAsync(p => p.Id == id);
+
             if (property == null)
                 return NotFound();
 
-            return Ok(property.Adapt<PropertyResponseDto>());
+            var dto = property.Adapt<PropertyResponseDto>();
+            // Calculate IsOccupied for each unit
+            foreach (var unitDto in dto.Units)
+            {
+                unitDto.IsOccupied = await _uow.Residents.Query()
+                    .AnyAsync(r => r.UnitId == unitDto.Id && !r.IsDeleted);
+            }
+
+            return Ok(dto);
+            //var property = await _uow.Properties.GetByIdAsync(id);
+            //if (property == null)
+            //    return NotFound();
+
+            //return Ok(property.Adapt<PropertyResponseDto>());
         }
 
         [HttpPut("{id}")]

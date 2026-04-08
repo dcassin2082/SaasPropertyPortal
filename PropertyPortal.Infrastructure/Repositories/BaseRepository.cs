@@ -25,7 +25,8 @@ namespace PropertyPortal.Infrastructure.Repositories
          * a keyless entity type, call 'HasNoKey' in 'OnModelCreating'. For more information on keyless entity types, see https://*/
         public virtual IQueryable<T> Query()
         {
-            return _context.Set<T>().AsNoTracking(); // Allows for .Include() in the service layer
+            var query = _context.Set<T>().AsNoTracking();
+            return query; // Allows for .Include() in the service layer
         }
 
         public virtual async Task<T?> GetByIdAsync(Guid id)
@@ -171,5 +172,9 @@ namespace PropertyPortal.Infrastructure.Repositories
             }
         }
 
+        public async Task AddRangeAsync(IEnumerable<T> entities)
+        {
+            await _context.Set<T>().AddRangeAsync(entities);
+        }
     }
 }

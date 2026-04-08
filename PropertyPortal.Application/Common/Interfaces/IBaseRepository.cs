@@ -12,6 +12,6 @@ namespace Application.Common.Interfaces
         Task<T> PutAsync(Guid id, T entity);
         IQueryable<T> Query();
         Task<PaginatedResult<TDestination>> GetPagedAsync<TDestination>(IQueryable<TDestination> query, int pageNumber, int pageSize, string? sortBy, bool isDescending);
-
+        Task AddRangeAsync(IEnumerable<T> entities);
     }
 }

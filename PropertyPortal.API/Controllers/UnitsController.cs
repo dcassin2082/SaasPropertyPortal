@@ -5,6 +5,8 @@ using Microsoft.EntityFrameworkCore;
 using PropertyPortal.Application.Common.Interfaces;
 using PropertyPortal.Application.DTOs.Units;
 using PropertyPortal.Domain.Entities;
+using PropertyPortal.Domain.Enums;
+using System.Linq;
 
 namespace PropertyPortal.API.Controllers
 {
@@ -14,10 +16,12 @@ namespace PropertyPortal.API.Controllers
     public class UnitsController : ControllerBase
     {
         private readonly IUnitOfWork _uow;
+        private readonly ITenantProvider _tenantProvider;
 
-        public UnitsController(IUnitOfWork uow)
+        public UnitsController(IUnitOfWork uow, ITenantProvider tenantProvider)
         {
             _uow = uow;
+            _tenantProvider = tenantProvider;
         }
 
         // GET: api/Units
@@ -59,7 +63,7 @@ namespace PropertyPortal.API.Controllers
         {
             // Filter by propertyId if it exists, otherwise keep it empty for safety
             if (!propertyId.HasValue) return Ok(new List<UnitResponseDto>());
-
+            
             var units = await _uow.Units.Query()
                 .Where(u => u.PropertyId == propertyId.Value)
                 .Select(u => new UnitResponseDto
@@ -72,7 +76,11 @@ namespace PropertyPortal.API.Controllers
                     Rent = u.Rent,
                     CreatedAt = u.CreatedAt,
                     PropertyId = u.PropertyId,
-                    PropertyName = u.Property.Name
+                    PropertyName = u.Property.Name,
+                    TenantName = _uow.Residents.Query().Where(r => r.UnitId == u.Id && !r.IsDeleted)
+                    .Where(r => !string.IsNullOrWhiteSpace(r.FirstName))
+                    .Select(r => r.FirstName + " " + r.LastName).FirstOrDefault(),
+                    IsOccupied = _uow.Residents.Query().Any(r => r.UnitId == u.Id && !r.IsDeleted)
                 })
                 .ToListAsync();
 
@@ -123,6 +131,59 @@ namespace PropertyPortal.API.Controllers
             //    Bathrooms = unit.Bathrooms.HasValue ? (int)unit.Bathrooms : 0,
             //    Rent = unit.Rent
             //});
+        }
+
+        [HttpPost("bulk")]
+        public async Task<ActionResult> BulkCreate([FromBody] UnitBulkCreateDto dto)
+        {
+            var property = await _uow.Properties.GetByIdAsync(dto.PropertyId);
+            if (property == null) return NotFound("Property not found");
+
+            var newUnits = new List<Unit>();
+
+            var existingUnitNumbers = await _uow.Units.Query()
+                .Where(u => u.PropertyId == dto.PropertyId)
+                .Select(u => u.UnitNumber)
+                .ToListAsync();
+
+            for (int i = 0; i < dto.Count; i++)
+            {
+                var unitNumber = (dto.StartingNumber + i).ToString();
+
+                // Skip if it already exists
+                if (existingUnitNumbers.Contains(unitNumber)) continue;
+
+                newUnits.Add(new Unit
+                {
+                    PropertyId = dto.PropertyId,
+                    UnitNumber = unitNumber,
+                    Rent = dto.BaseRent,
+                    UnitType = dto.UnitType ?? "Standard",
+                    TenantId = _tenantProvider.GetTenantId(), // Ensure multi-tenancy
+                    Status = UnitStatus.Vacant.ToString(),
+                    Address = new Address(
+                            property.Address.Street,
+                            unitNumber, // This sets the specific Unit # for this address
+                            property.Address.City,
+                            property.Address.State,
+                            property.Address.ZipCode
+                        )
+                    //Address =
+                    //{
+                    //    Street = "",
+                    //    UnitNumber = "",
+                    //    City = "",
+                    //    State = "",
+                    //    ZipCode
+
+                    //}
+                });
+            }
+
+            await _uow.Units.AddRangeAsync(newUnits);
+            await _uow.CompleteAsync();
+
+            return Ok(new { count = newUnits.Count });
         }
 
         // PUT: api/Units/5

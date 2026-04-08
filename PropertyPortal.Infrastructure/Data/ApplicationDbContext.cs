@@ -360,18 +360,18 @@ public partial class ApplicationDbContext : DbContext
 
             entity.Property(e => e.Id).ValueGeneratedNever();
             // flattened address record
-            entity.ComplexProperty(p => p.Address, a =>
-            {
-                // This maps C# 'Street' to SQL column 'Address_Street'
-                a.Property(ad => ad.Street).HasMaxLength(200).HasColumnName("Address_Street");
-                a.Property(ad => ad.UnitNumber).HasMaxLength(50).HasColumnName("Address_UnitNumber");
-                a.Property(ad => ad.City).HasMaxLength(100).HasColumnName("Address_City");
-                a.Property(ad => ad.State).HasMaxLength(50).HasColumnName("Address_State");
-                a.Property(ad => ad.ZipCode).HasMaxLength(20).HasColumnName("Address_ZipCode");
-            });
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");
+            //entity.ComplexProperty(p => p.Address, a =>
+            //{
+            //    // This maps C# 'Street' to SQL column 'Address_Street'
+            //    a.Property(ad => ad.Street).HasMaxLength(200).HasColumnName("Address_Street");
+            //    a.Property(ad => ad.UnitNumber).HasMaxLength(50).HasColumnName("Address_UnitNumber");
+            //    a.Property(ad => ad.City).HasMaxLength(100).HasColumnName("Address_City");
+            //    a.Property(ad => ad.State).HasMaxLength(50).HasColumnName("Address_State");
+            //    a.Property(ad => ad.ZipCode).HasMaxLength(20).HasColumnName("Address_ZipCode");
+            //});
+            //entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");
             entity.Property(e => e.Description).HasMaxLength(500);
-            entity.Property(e => e.Name).HasMaxLength(200);
+            //entity.Property(e => e.Name).HasMaxLength(200);
             entity.Property(e => e.Rent).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.RowVersion)
                 .IsRowVersion()
