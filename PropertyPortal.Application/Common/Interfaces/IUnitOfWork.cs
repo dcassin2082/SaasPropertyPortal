@@ -1,11 +1,14 @@
 ﻿using Application.Common.Interfaces;
+using Microsoft.EntityFrameworkCore.Storage;
 using PropertyPortal.Domain.Entities;
+using System.Data;
 
 namespace PropertyPortal.Application.Common.Interfaces
 {
     public interface IUnitOfWork : IDisposable
     {
         // Access points for your repositories
+        IBaseRepository<Applicant> Applicants { get; }
         IBaseRepository<Property> Properties { get; }
         IBaseRepository<Unit> Units { get; }
         IBaseRepository<Lease> Leases { get; }
@@ -15,6 +18,7 @@ namespace PropertyPortal.Application.Common.Interfaces
         IBaseRepository<PropertyManager> PropertyManagers { get; }
         // The "Big Button" to save everything in one transaction
         Task<int> CompleteAsync();
+        Task<IDbContextTransaction> BeginTransactionAsync();
     }
 
 }

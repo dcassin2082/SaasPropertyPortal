@@ -21,6 +21,7 @@ namespace PropertyPortal.Infrastructure.Repositories
             _context = context;
             _tenantProvider = tenantProvider;
         }
+
         /*System.InvalidOperationException: 'The entity type 'Address' requires a primary key to be defined. If you intended to use
          * a keyless entity type, call 'HasNoKey' in 'OnModelCreating'. For more information on keyless entity types, see https://*/
         public virtual IQueryable<T> Query()
@@ -168,7 +169,8 @@ namespace PropertyPortal.Infrastructure.Repositories
 
                 // You could also include the Unit or Property name if they are loaded, 
                 // or just a descriptive string for searchability.
-                resident.Description = $"Resident at Unit {resident.Address.UnitNumber}";
+                //resident.Description = $"Resident at Unit {resident.Address.UnitNumber}";
+                resident.Description = "description";
             }
         }
 

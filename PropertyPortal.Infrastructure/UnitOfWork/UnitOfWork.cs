@@ -1,5 +1,6 @@
 ﻿using Application.Common.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using PropertyPortal.Application.Common.Interfaces;
 using PropertyPortal.Domain.Entities;
 using PropertyPortal.Infrastructure.Data;
@@ -19,6 +20,7 @@ namespace PropertyPortal.Infrastructure.UnitOfWork
             _tenantProvider = tenantProvider;
         }
 
+        public IBaseRepository<Applicant> Applicants => new BaseRepository<Applicant>(_context, _tenantProvider);
         public IBaseRepository<User> Users => new BaseRepository<User>(_context, _tenantProvider);
         public IBaseRepository<Tenant> Tenants => new BaseRepository<Tenant>(_context, _tenantProvider);
         public IBaseRepository<Property> Properties => new BaseRepository<Property>(_context, _tenantProvider);
@@ -27,6 +29,11 @@ namespace PropertyPortal.Infrastructure.UnitOfWork
         public IBaseRepository<Resident> Residents => new BaseRepository<Resident>(_context, _tenantProvider);
         // Initialize the join table repository
         public IBaseRepository<PropertyManager> PropertyManagers => new BaseRepository<PropertyManager>(_context, _tenantProvider);
+
+        public Task<IDbContextTransaction> BeginTransactionAsync()
+        {
+            return _context.Database.BeginTransactionAsync();
+        }
 
         public async Task<int> CompleteAsync()
         {

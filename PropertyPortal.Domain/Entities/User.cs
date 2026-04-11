@@ -1,4 +1,5 @@
 ﻿using PropertyPortal.Domain.Common;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PropertyPortal.Domain.Entities;
 
@@ -18,5 +19,6 @@ public partial class User : BaseEntity
 
     public virtual ICollection<MaintenanceRequest> MaintenanceRequests { get; set; } = new List<MaintenanceRequest>();
 
+    [ForeignKey("TenantId")]
     public virtual Tenant Tenant { get; set; } = null!;
 }

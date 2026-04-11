@@ -4,6 +4,7 @@ using Mapster;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
 using PropertyPortal.API.Converters;
 using PropertyPortal.API.Filters;
 using PropertyPortal.Application.Common.Interfaces;
@@ -22,6 +23,7 @@ using PropertyPortal.Infrastructure.Web.Filters;
 using Scalar.AspNetCore;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -63,8 +65,29 @@ TypeAdapterConfig<Resident, ResidentResponseDto>
     // Explicitly map the Address complex type
     //.Map(dest => dest.Address, src => src.Address)
     // Flatten the Property Name from the navigation property
-    .Map(dest => dest.PropertyName, src => src.Property != null ? src.Property.Name : "Unassigned");
-
+    .Map(dest => dest.PropertyName, src => src.Property != null ? src.Property.Name : "Unassigned")
+// Pull from the active lease contract, not the unit's market price.
+    .Map(dest => dest.RentAmount, src => src.Leases
+        .Where(l => l.Status == "Active" &&
+                    l.StartDate <= DateOnly.FromDateTime(DateTime.UtcNow) &&
+                    l.EndDate >= DateOnly.FromDateTime(DateTime.UtcNow) &&
+                    !l.IsDeleted)
+        .Select(l => l.MonthlyRent)
+        .FirstOrDefault())
+    .Map(dest => dest.LeaseStartDate, src => src.Leases
+            .Where(l => l.Status == "Active" &&
+                        l.StartDate <= DateOnly.FromDateTime(DateTime.UtcNow) &&
+                        l.EndDate >= DateOnly.FromDateTime(DateTime.UtcNow) &&
+                        !l.IsDeleted)
+            .Select(l => l.StartDate)
+            .FirstOrDefault())
+    .Map(dest => dest.LeaseEndDate, src => src.Leases
+            .Where(l => l.Status == "Active" &&
+                        l.StartDate <= DateOnly.FromDateTime(DateTime.UtcNow) &&
+                        l.EndDate >= DateOnly.FromDateTime(DateTime.UtcNow) &&
+                        !l.IsDeleted)
+            .Select(l => l.EndDate)
+            .FirstOrDefault());
 
 TypeAdapterConfig<ResidentRequestDto, Resident>
     .NewConfig()
@@ -86,7 +109,13 @@ builder.Services.AddControllers(options =>
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new ByteArrayToNullableBase64Converter());
+        //options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
     });
+
+builder.Services.AddEndpointsApiExplorer(); // Required for Swagger to discover endpoints
+
+// Generates the Swagger specification
+builder.Services.AddSwaggerGen();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -122,12 +151,15 @@ app.UseCors(builder => builder.AllowAnyMethod().AllowAnyHeader().AllowAnyOrigin(
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
+    app.UseSwagger();   // Serves the generated JSON document
+    app.UseSwaggerUI(); // Serves the interactive UI (at /swagger)
+
     // Map the OpenAPI endpoint
     app.MapOpenApi();
     // Map the Scalar API reference UI
-    app.MapScalarApiReference();
-    // Optional: Redirect the root URL to the Scalar UI
-    app.MapGet("/", () => Results.Redirect("/scalar/v1"));
+    //app.MapScalarApiReference();
+    //// Optional: Redirect the root URL to the Scalar UI
+    //app.MapGet("/", () => Results.Redirect("/scalar/v1"));
 }
 
 app.UseHttpsRedirection();

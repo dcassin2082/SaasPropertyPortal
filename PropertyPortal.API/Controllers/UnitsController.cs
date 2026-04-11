@@ -161,13 +161,13 @@ namespace PropertyPortal.API.Controllers
                     UnitType = dto.UnitType ?? "Standard",
                     TenantId = _tenantProvider.GetTenantId(), // Ensure multi-tenancy
                     Status = UnitStatus.Vacant.ToString(),
-                    Address = new Address(
-                            property.Address.Street,
-                            unitNumber, // This sets the specific Unit # for this address
-                            property.Address.City,
-                            property.Address.State,
-                            property.Address.ZipCode
-                        )
+                    //Address = new Address(
+                    //        property.Address.Street,
+                    //        unitNumber, // This sets the specific Unit # for this address
+                    //        property.Address.City,
+                    //        property.Address.State,
+                    //        property.Address.ZipCode
+                    //    )
                     //Address =
                     //{
                     //    Street = "",

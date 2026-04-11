@@ -1,5 +1,6 @@
 ﻿using PropertyPortal.Domain.Core.Interfaces;
 using PropertyPortal.Domain.Common;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PropertyPortal.Domain.Entities;
 
@@ -7,7 +8,7 @@ public partial class Unit : BaseEntity
 {
     public Guid PropertyId { get; set; }
 
-    public string UnitNumber { get; set; } = null!;
+    public string? UnitNumber { get; set; } = null!;
 
     public int? Bedrooms { get; set; }
 
@@ -27,9 +28,8 @@ public partial class Unit : BaseEntity
 
     // from ILocatable interface
     //public string Name { get; set; } = null!;
-    public Address Address { get; set; } = null!; // EF will flatten this into Property_Street, etc.
     public string? Description { get; set; }
-    public string UnitType { get; set; } = null!;
-    public string Status { get; set; } = null!;
+    public string? UnitType { get; set; } = null!;
+    public string? Status { get; set; } = null!;
 
 }

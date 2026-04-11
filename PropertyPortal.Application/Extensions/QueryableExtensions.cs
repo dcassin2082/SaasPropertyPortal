@@ -47,5 +47,11 @@ namespace PropertyPortal.Application.Extensions
                  (x.Address.ZipCode != null && x.Address.ZipCode.Contains(term)) ||
                   x.Description != null && x.Description.Contains(term));
         }
+
+        public static IQueryable<Lease> WhereActive(this IQueryable<Lease> query)
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            return query.Where(l => l.StartDate <= today && l.EndDate >= today && !l.IsDeleted);
+        }
     }
 }

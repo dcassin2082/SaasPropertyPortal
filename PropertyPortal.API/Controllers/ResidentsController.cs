@@ -6,6 +6,7 @@ using PropertyPortal.Application.DTOs.Properties;
 using PropertyPortal.Application.DTOs.Residents;
 using PropertyPortal.Application.Extensions;
 using PropertyPortal.Domain.Entities;
+using PropertyPortal.Domain.Enums;
 using System.Security.Claims;
 using System.Text;
 
@@ -15,10 +16,12 @@ public class ResidentsController : ControllerBase
 {
     private readonly IUnitOfWork _uow;
     private readonly ITenantProvider _tenantProvider;
-    public ResidentsController(IUnitOfWork uow, ITenantProvider tenantProvider)
+    private readonly ILogger<ResidentsController> _logger;
+    public ResidentsController(IUnitOfWork uow, ITenantProvider tenantProvider, ILogger<ResidentsController> logger)
     {
         _uow = uow;
         _tenantProvider = tenantProvider;
+        _logger = logger;
     }
 
     [HttpGet]
@@ -28,10 +31,10 @@ public class ResidentsController : ControllerBase
     [FromQuery] string? status = null)
     {
         var userId = _tenantProvider.GetUserId() ?? Guid.Parse("3D91A36C-F52C-45B2-8B47-67B87303640A");
-        var now = DateTime.UtcNow;
 
         // 1. Get the list of Property IDs this user is allowed to manage FIRST
-        List<Guid> allowedPropertyIds = await GetManagedPropertyIdsAsync(userId);
+        List<Guid?> allowedPropertyIds = await GetManagedPropertyIdsAsync(userId);
+
         // 2. Start the resident query using the pre-fetched IDs
         var query = _uow.Residents.Query()
             .IgnoreQueryFilters()
@@ -48,46 +51,91 @@ public class ResidentsController : ControllerBase
         {
             query = query.Where(r => r.PropertyId == propertyId.Value);
         }
+        var now = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        // 2. Filter by Status (Lease Date Logic)
-        if (!string.IsNullOrEmpty(status))
+        query = status.ToLower() switch
         {
-            query = status.ToLower() switch
-            {
-                "active" => query.Where(r => r.LeaseStartDate <= DateOnly.FromDateTime(now) && r.LeaseEndDate >= DateOnly.FromDateTime(now)),
-                "upcoming" => query.Where(r => r.LeaseStartDate > DateOnly.FromDateTime(now)),
-                "past" => query.Where(r => r.LeaseEndDate < DateOnly.FromDateTime(now)),
-                _ => query
-            };
-        }
-        query = query.ApplyResidentSearch(search);
-        /*System.Data.SqlTypes.SqlNullValueException: 'Data is Null. This method or property cannot be called on Null values.'
-            */
-        //var residents = await query
-        //    .Include(r => r.Unit)
-        //    .Include(r => r.Property)
-        //    .ToListAsync();
+            // Residents who have a lease that covers today
+            "active" => query.Where(r => r.Leases.Any(l =>
+                l.Status == "Active" &&
+                l.StartDate <= now &&
+                l.EndDate >= now)),
 
+            // Residents who have a lease starting in the future, but no currently active ones
+            "upcoming" => query.Where(r => r.Leases.Any(l => l.StartDate > now) &&
+                                        !r.Leases.Any(l => l.StartDate <= now && l.EndDate >= now)),
+
+            // Residents where all leases are in the past
+            "past" => query.Where(r => r.Leases.All(l => l.EndDate < now) && r.Leases.Any()),
+
+            _ => query
+        };
+        query = query.ApplyResidentSearch(search);
+        //var residents = await query
+        //    .AsNoTracking() // Important: ignore local cache
+        //    .Select(r => new {
+        //        Res = r,
+        //        // Specifically look for the lease linked by ResidentId
+        //        Lease = r.Leases
+        //            .Where(l => l.Status == "Active" && !l.IsDeleted)
+        //            //.Where(l => l.StartDate <= now && l.EndDate >= now)
+        //            .OrderByDescending(l => l.CreatedAt)
+        //            .FirstOrDefault()
+        //})
+        //.Select(x => new ResidentResponseDto(
+        //    x.Res.Id,
+        //    x.Res.PropertyId,
+        //    x.Res.Property != null ? x.Res.Property.Name : "Unassigned",
+        //    x.Res.UnitId,
+        //    x.Res.Unit != null ? x.Res.Unit.UnitNumber : "N/A",
+        //    $"{x.Res.FirstName} {x.Res.LastName}",
+        //    x.Res.Email,
+        //    x.Res.Phone,
+        //    // If Lease exists, use Lease dates; otherwise, use Resident dates
+        //    x.Lease != null ? x.Lease.StartDate : x.Res.LeaseStartDate,
+        //    x.Lease != null ? x.Lease.EndDate : x.Res.LeaseEndDate,
+        //    // If Lease exists, use Lease rent; otherwise, return 0
+        //    x.Lease != null ? x.Lease.MonthlyRent : 0,
+        //    x.Res.IsDeleted,
+        //    x.Res.Property != null
+        //        ? $"{x.Res.Property.Address.Street}, {x.Res.Property.Address.City}, {x.Res.Property.Address.State}"
+        //        : "No Address",
+        //    x.Lease != null ? x.Lease.Status : x.Res.Status
+        //))
+        //.ToListAsync();
         var residents = await query
-        .Select(r => new ResidentResponseDto(
-        r.Id,
-        r.PropertyId,
-        r.Property != null ? r.Property.Name : "Unassigned",
-        r.UnitId,
-        r.Unit != null ? r.Unit.UnitNumber : "N/A",
-        $"{r.FirstName} {r.LastName}",
-        r.Email,
-        r.Phone,
-        r.LeaseStartDate,
-        r.LeaseEndDate,
-        r.Unit != null ? r.Unit.Rent : 0,
-        r.IsDeleted,
-        // Pull the address from the PROPERTY, not the UNIT
-        r.Property != null
-            ? $"{r.Property.Address.Street}, {r.Property.Address.City}, {r.Property.Address.State}"
-            : "No Address"
+    .AsNoTracking()
+    .Select(r => new {
+        Resident = r,
+        ActiveLease = r.Leases
+            .Where(l => l.Status == "Active" && !l.IsDeleted)
+            .OrderByDescending(l => l.CreatedAt)
+            .FirstOrDefault()
+    })
+    // Flatten the data immediately into primitive types or the DTO
+    .Select(x => new ResidentResponseDto(
+        x.Resident.Id,
+        x.Resident.PropertyId,
+        x.Resident.Property != null ? x.Resident.Property.Name : "Unassigned",
+        x.Resident.UnitId,
+        x.Resident.Unit != null ? x.Resident.Unit.UnitNumber : "N/A",
+        $"{x.Resident.FirstName} {x.Resident.LastName}",
+        x.Resident.Email,
+        x.Resident.Phone,
+        x.ActiveLease != null ? x.ActiveLease.StartDate : x.Resident.LeaseStartDate,
+        x.ActiveLease != null ? x.ActiveLease.EndDate : x.Resident.LeaseEndDate,
+        x.ActiveLease != null ? x.ActiveLease.MonthlyRent : 0,
+        x.Resident.IsDeleted,
+        x.Resident.Property != null
+            ? $"{x.Resident.Property.Address.Street}, {x.Resident.Property.Address.City}, {x.Resident.Property.Address.State}"
+            : "No Address",
+        x.ActiveLease != null ? x.ActiveLease.Status : x.Resident.Status
     ))
     .ToListAsync();
+
+        var testLeaseCount = await _uow.Leases.Query().CountAsync();
+        Console.WriteLine($"Total Leases in DB: {testLeaseCount}");
+        var res = residents;
         return Ok(new ResidentListResponse
         {
             //Residents = residents.Adapt<List<ResidentResponseDto>>(),
@@ -140,6 +188,28 @@ public class ResidentsController : ControllerBase
         });
 
         return Ok(formattedTrends);
+    }
+
+    [HttpGet("unassigned")]
+    public async Task<ActionResult<IEnumerable<UnassignedResidentDto>>> GetUnassignedResidents()
+    {
+        // Lead Tip: Log the request to track how often users are looking for unassigned residents
+        _logger.LogInformation("Fetching all unassigned residents for move-in workflow.");
+
+        var residents = await _uow.Residents.Query()
+            .Where(r => r.UnitId == null && !r.IsDeleted)
+            .OrderBy(r => r.LastName)
+            .Select(r => new UnassignedResidentDto
+            {
+                Id = r.Id,
+                FirstName = r.FirstName,
+                LastName = r.LastName,
+                Email = r.Email,
+                Status = r.Status ?? "Pending"
+            })
+        .ToListAsync();
+
+        return Ok(residents);
     }
 
     //[HttpGet]
@@ -276,34 +346,237 @@ public class ResidentsController : ControllerBase
 
         return Ok(resident.Adapt<ResidentResponseDto>());
     }
+    //[HttpPost]
+    //public async Task<IActionResult> CreateResident([FromBody] CreateResidentRequestDto dto)
+    //{
+    //    // 1. Create the Resident (The Person)
+    //    var resident = new Resident
+    //    {
+    //        FirstName = dto.FirstName,
+    //        LastName = dto.LastName,
+    //        PropertyId = dto.PropertyId,
+    //        UnitId = dto.UnitId,
+    //        Status = "Current", // Or "Approved"
+    //        Address = dto.CurrentAddress // Their mailing address
+    //    };
 
-    [HttpPost]
-    public async Task<ActionResult<ResidentResponseDto>> PostResident(ResidentRequestDto dto)
+    //    await _uow.Residents.PostAsync(resident);
+
+    //    // 2. Create the Lease (The Contract)
+    //    var lease = new Lease
+    //    {
+    //        ResidentId = resident.Id, // Link to the ID we just created
+    //        UnitId = dto.UnitId,
+    //        StartDate = dto.StartDate,
+    //        EndDate = dto.EndDate,
+    //        MonthlyRent = dto.RentAmount,
+    //        Status = "Active"
+    //    };
+
+    //    await _uow.Leases.PostAsync(lease);
+    //    await _uow.SaveChangesAsync();
+
+    //    return Ok(resident);
+    //}
+
+    public async Task MoveInTenant(Guid applicantId)
     {
-        // 1. Map DTO to Entity
-        // Mapster uses your Program.cs config to handle the Address complex type
-        var resident = dto.Adapt<Resident>();
+        var applicant = await _uow.Applicants.GetByIdAsync(applicantId);
 
-        // 2. Persist via BaseRepository
-        // This triggers:
-        // - Your ValidationFilter (running ResidentValidator + AddressValidator)
-        // - Your BaseRepository logic (setting TenantId & syncing ILocatable.Name)
+        // 1. Create Resident from Applicant data
+        var resident = new Resident
+        {
+            FirstName = applicant.FirstName,
+            LastName = applicant.LastName,
+            UnitId = applicant.UnitId,
+            PropertyId = applicant.PropertyId,
+            Status = "Current"
+        };
         await _uow.Residents.PostAsync(resident);
 
-        // 3. Save to database
+        // 2. Create the Lease (using data from the Wizard UI)
+        var lease = new Lease
+        {
+            ResidentId = resident.Id,
+            UnitId = applicant.UnitId,
+            //StartDate = wizardDto.StartDate,
+            //EndDate = wizardDto.EndDate,
+            //MonthlyRent = wizardDto.Rent
+        };
+        await _uow.Leases.PostAsync(lease);
+
+        // 3. Update the Unit Status
+        var unit = await _uow.Units.GetByIdAsync(applicant.UnitId);
+        unit.Status = "Occupied";
+
+        // 4. Cleanup
+        applicant.Status = "Converted"; // Or delete the applicant record
+
         await _uow.CompleteAsync();
+    }
 
-        // 4. Return the Response DTO (this was NOT returning the propertyName)
-        // We fetch it again or adapt the tracked entity to include the Property Name
-        var response = resident.Adapt<ResidentResponseDto>();
+    [HttpPost]
+    public async Task<ActionResult<ResidentResponseDto>> PostResident([FromBody] ResidentRequestDto dto)
+    {
+        // need to get name, contact info stuff from the applicant
+        // put an applicants drop down on the Add New Resident form and pass that id
+        // for start, end dates we already have date-pickers 
 
-        //// RE-FETCH with Include so Mapster can see the Property Name
-        //var freshResident = await _uow.Residents.Query()
-        //    .Include(r => r.Property)
-        //    .FirstOrDefaultAsync(r => r.Id == resident.Id);
-        //var response = freshResident.Adapt<ResidentResponseDto>();
+        // QUESTION: should we let the manager set the rent on the react form or should it come from unit?
+        //              rent values change constantly, also change based on the length of the lease
+
+        // Test Guid - remove after setting up front end
+        Guid applicantId = Guid.Parse("8861C6BA-E5BD-4961-9B1E-29CA17C63A44");
+        var applicant = await _uow.Applicants.GetByIdAsync(applicantId);
+
+        // 1. Create Resident from Applicant data
+        var resident = new Resident
+        {
+            FirstName = applicant.FirstName,
+            LastName = applicant.LastName,
+            Email = applicant.Email,
+            Phone = dto.Phone, // using dto for now, need to add to applicant table, after resident is created this stuff will be edited in residents table
+            UnitId = applicant.UnitId,
+            PropertyId = applicant.PropertyId,
+            Status = "Current"
+        };
+        await _uow.Residents.PostAsync(resident);
+        var userId = _tenantProvider.GetUserId();
+        // 2. Create the Lease (using data from the Wizard UI)
+        var lease = new Lease
+        {
+            ResidentId = resident.Id,
+            UnitId = applicant.UnitId,
+            StartDate = dto.LeaseStartDate,
+            EndDate = dto.LeaseEndDate,
+            MonthlyRent = dto.RentAmount,
+            UserId = (Guid)userId,
+            Status = "Active"
+            //StartDate = wizardDto.StartDate,
+            //EndDate = wizardDto.EndDate,
+            //MonthlyRent = wizardDto.Rent
+        };
+        await _uow.Leases.PostAsync(lease);
+
+        // 3. Update the Unit Status
+        var unit = await _uow.Units.GetByIdAsync(applicant.UnitId);
+        unit.Status = "Occupied";
+
+        // 4. Cleanup
+        applicant.Status = "Converted"; // Or delete the applicant record
+
+        await _uow.CompleteAsync();
+       
+        var freshResident = await _uow.Residents.Query()
+            .Include(r => r.Property)
+            .Include(l => l.Leases)
+            .FirstOrDefaultAsync(r => r.Id == resident.Id);
+        var response = freshResident.Adapt<ResidentResponseDto>();
 
         return CreatedAtAction(nameof(GetResident), new { id = resident.Id }, response);
+    }
+
+    [HttpPost("move-in")]
+    public async Task<IActionResult> MoveInResident([FromBody] MoveInRequest request)
+    {
+        using var transaction = await _uow.BeginTransactionAsync();
+
+        try
+        {
+            var resident = await _uow.Residents.GetByIdAsync(request.ResidentId);
+            var unit = await _uow.Units.GetByIdAsync(request.UnitId);
+
+            if (resident == null || unit == null) return NotFound();
+
+            // 1. Create the Lease Record (The Financial Truth)
+            var newLease = new Lease
+            {
+                Id = Guid.NewGuid(),
+                TenantId = resident.Id, // Your FK to the Resident
+                UnitId = unit.Id,
+                UserId = _tenantProvider.GetUserId() ?? Guid.Empty,
+                StartDate = request.StartDate,
+                EndDate = request.EndDate,
+                MonthlyRent = unit.Rent, // Snapshot the current rent price!
+                DepositAmount = request.DepositAmount,
+                Status = "Active"
+            };
+
+            await _uow.Leases.PostAsync(newLease);
+
+            // 2. Update the Resident (The Occupancy Link)
+            resident.UnitId = unit.Id;
+            // Optional: Keep these in sync if you're still using the Resident columns for now
+            resident.LeaseStartDate = request.StartDate;
+            resident.LeaseEndDate = request.EndDate;
+
+            // 3. Update the Unit (The Inventory Status)
+            unit.Status = "Occupied";
+
+            await _uow.CompleteAsync();
+            await transaction.CommitAsync();
+
+            return Ok();
+        }
+        catch (Exception)
+        {
+            await transaction.RollbackAsync();
+            return StatusCode(500, "Transaction failed");
+        }
+    }
+
+    [HttpPatch("{residentId}/move-in/{unitId}")]
+    public async Task<IActionResult> MoveIn(Guid residentId, Guid unitId)
+    {
+        // Start a Transaction (Very important for Lead roles)
+        using var transaction = await _uow.BeginTransactionAsync();
+
+        try
+        {
+            var resident = await _uow.Residents.GetByIdAsync(residentId);
+            //var targetUnit = await _uow.Units.GetByIdAsync(unitId);
+
+            // Lead-level Validation: Is the resident already in another unit?
+            if (resident?.UnitId != null)
+            {
+                // This turns a "Move-In" into a "Transfer"
+                _logger.LogInformation("Resident {id} is transferring units.", residentId);
+            }
+
+            resident?.UnitId = unitId;
+            resident?.Status = "Active";
+
+            // Update the Address record on the resident to match the new unit
+            var targetUnit = await _uow.Units.Query()
+                .Include(u => u.Property) // Include this if you need to check Property rules
+                .FirstOrDefaultAsync(u => u.Id == unitId);
+
+            if (targetUnit == null) return NotFound("Unit not found.");
+
+            // 2. Perform your logic now that you have the object
+            //targetUnit.Status = "Occupied";
+            targetUnit.Status = UnitStatus.Occupied.ToString();
+
+            resident?.Address = new Address(
+                targetUnit?.Property.Address.Street,
+                targetUnit?.UnitNumber,
+                targetUnit?.Property.Address.City,
+                targetUnit?.Property.Address.State,
+                targetUnit?.Property.Address.ZipCode
+            );
+
+            if (targetUnit is not null)
+                await _uow.Units.PutAsync(unitId, targetUnit);
+            await _uow.CompleteAsync();
+            await transaction.CommitAsync();
+
+            return Ok();
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            return StatusCode(500, "Transaction failed during Move-In.");
+        }
     }
 
     [HttpPut("{id}")]
@@ -336,7 +609,7 @@ public class ResidentsController : ControllerBase
         return NoContent();
     }
 
-    private async Task<List<Guid>> GetManagedPropertyIdsAsync(Guid userId)
+    private async Task<List<Guid?>> GetManagedPropertyIdsAsync(Guid userId)
     {
         return await _uow.PropertyManagers.Query()
         .Where(pm => pm.UserId == userId)

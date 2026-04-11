@@ -23,6 +23,96 @@ namespace PropertyPortal.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("PropertyPortal.Domain.Entities.Applicant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ApplicationDate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("sysutcdatetime()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("CreditScore")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CurrentCity")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("CurrentState")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("CurrentStreet")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("CurrentUnitNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("CurrentZipCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("PropertyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UnitId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id")
+                        .HasName("PK__Applican__3214EC07403A5D0A");
+
+                    b.HasIndex(new[] { "TenantId" }, "IX_Applicants_TenantId");
+
+                    b.ToTable("Applicants", "dbo");
+                });
+
             modelBuilder.Entity("PropertyPortal.Domain.Entities.Lease", b =>
                 {
                     b.Property<Guid>("Id")
@@ -47,6 +137,9 @@ namespace PropertyPortal.Infrastructure.Migrations
 
                     b.Property<decimal>("MonthlyRent")
                         .HasColumnType("decimal(18, 2)");
+
+                    b.Property<Guid>("ResidentId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
@@ -79,15 +172,15 @@ namespace PropertyPortal.Infrastructure.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.HasKey("Id")
-                        .HasName("PK__Leases__3214EC07752D3833");
+                    b.HasKey("Id");
+
+                    b.HasIndex("ResidentId");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("UnitId");
 
                     b.HasIndex("UserId");
-
-                    b.HasIndex(new[] { "TenantId" }, "IX_Leases_Tenant_Active")
-                        .HasFilter("([IsDeleted]=(0))");
 
                     b.ToTable("Leases");
                 });
@@ -234,6 +327,10 @@ namespace PropertyPortal.Infrastructure.Migrations
                     b.Property<Guid>("CreatedBy")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
@@ -266,28 +363,29 @@ namespace PropertyPortal.Infrastructure.Migrations
                             b1.IsRequired();
 
                             b1.Property<string>("City")
-                                .IsRequired()
                                 .HasMaxLength(100)
-                                .HasColumnType("nvarchar(100)");
+                                .HasColumnType("nvarchar(100)")
+                                .HasColumnName("Address_City");
 
                             b1.Property<string>("State")
-                                .IsRequired()
                                 .HasMaxLength(50)
-                                .HasColumnType("nvarchar(50)");
+                                .HasColumnType("nvarchar(50)")
+                                .HasColumnName("Address_State");
 
                             b1.Property<string>("Street")
-                                .IsRequired()
                                 .HasMaxLength(200)
-                                .HasColumnType("nvarchar(200)");
+                                .HasColumnType("nvarchar(200)")
+                                .HasColumnName("Address_Street");
 
                             b1.Property<string>("UnitNumber")
                                 .HasMaxLength(50)
-                                .HasColumnType("nvarchar(50)");
+                                .HasColumnType("nvarchar(50)")
+                                .HasColumnName("Address_UnitNumber");
 
                             b1.Property<string>("ZipCode")
-                                .IsRequired()
                                 .HasMaxLength(20)
-                                .HasColumnType("nvarchar(20)");
+                                .HasColumnType("nvarchar(20)")
+                                .HasColumnName("Address_ZipCode");
                         });
 
                     b.HasKey("Id")
@@ -297,6 +395,211 @@ namespace PropertyPortal.Infrastructure.Migrations
                         .HasFilter("([IsDeleted]=(0))");
 
                     b.ToTable("Properties");
+                });
+
+            modelBuilder.Entity("PropertyPortal.Domain.Entities.PropertyManager", b =>
+                {
+                    b.Property<Guid>("PropertyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("PropertyId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("PropertyManagers", (string)null);
+                });
+
+            modelBuilder.Entity("PropertyPortal.Domain.Entities.Resident", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("Id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("(sysutcdatetime())");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateOnly>("LeaseEndDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("LeaseStartDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid>("PropertyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("RentAmount")
+                        .HasColumnType("decimal(18, 2)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("UnitId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Address", "PropertyPortal.Domain.Entities.Resident.Address#Address", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("City")
+                                .HasMaxLength(100)
+                                .HasColumnType("nvarchar(100)")
+                                .HasColumnName("Address_City");
+
+                            b1.Property<string>("State")
+                                .HasMaxLength(50)
+                                .HasColumnType("nvarchar(50)")
+                                .HasColumnName("Address_State");
+
+                            b1.Property<string>("Street")
+                                .HasMaxLength(200)
+                                .HasColumnType("nvarchar(200)")
+                                .HasColumnName("Address_Street");
+
+                            b1.Property<string>("UnitNumber")
+                                .HasMaxLength(50)
+                                .HasColumnType("nvarchar(50)")
+                                .HasColumnName("Address_UnitNumber");
+
+                            b1.Property<string>("ZipCode")
+                                .HasMaxLength(20)
+                                .HasColumnType("nvarchar(20)")
+                                .HasColumnName("Address_ZipCode");
+                        });
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PropertyId");
+
+                    b.HasIndex("UnitId");
+
+                    b.HasIndex(new[] { "TenantId", "PropertyId" }, "IX_Residents_Tenant_Property");
+
+                    b.ToTable("Residents");
+                });
+
+            modelBuilder.Entity("PropertyPortal.Domain.Entities.ResidentNote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("(newid())");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("nvarchar(max)")
+                        .HasDefaultValue("");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("(getutcdate())");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("ResidentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id")
+                        .HasName("PK_ResidentNote");
+
+                    b.HasIndex("ResidentId");
+
+                    b.ToTable("ResidentNotes");
                 });
 
             modelBuilder.Entity("PropertyPortal.Domain.Entities.Tenant", b =>
@@ -360,15 +663,14 @@ namespace PropertyPortal.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("(sysutcdatetime())");
+                        .HasColumnType("datetime2");
 
                     b.Property<Guid>("CreatedBy")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
@@ -385,13 +687,18 @@ namespace PropertyPortal.Infrastructure.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
 
+                    b.Property<string>("Status")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("UnitNumber")
-                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("UnitType")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -482,8 +789,23 @@ namespace PropertyPortal.Infrastructure.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("PropertyPortal.Domain.Entities.Applicant", b =>
+                {
+                    b.HasOne("PropertyPortal.Domain.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("PropertyPortal.Domain.Entities.Lease", b =>
                 {
+                    b.HasOne("PropertyPortal.Domain.Entities.Resident", "Resident")
+                        .WithMany("Leases")
+                        .HasForeignKey("ResidentId")
+                        .IsRequired()
+                        .HasConstraintName("FK_Leases_Residents");
+
                     b.HasOne("PropertyPortal.Domain.Entities.Tenant", "Tenant")
                         .WithMany("Leases")
                         .HasForeignKey("TenantId")
@@ -501,6 +823,8 @@ namespace PropertyPortal.Infrastructure.Migrations
                         .HasForeignKey("UserId")
                         .IsRequired()
                         .HasConstraintName("FK_Leases_Users");
+
+                    b.Navigation("Resident");
 
                     b.Navigation("Tenant");
 
@@ -566,6 +890,51 @@ namespace PropertyPortal.Infrastructure.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("PropertyPortal.Domain.Entities.PropertyManager", b =>
+                {
+                    b.HasOne("PropertyPortal.Domain.Entities.Property", "Property")
+                        .WithMany()
+                        .HasForeignKey("PropertyId");
+
+                    b.HasOne("PropertyPortal.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Property");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("PropertyPortal.Domain.Entities.Resident", b =>
+                {
+                    b.HasOne("PropertyPortal.Domain.Entities.Property", "Property")
+                        .WithMany("Residents")
+                        .HasForeignKey("PropertyId")
+                        .IsRequired()
+                        .HasConstraintName("FK_Residents_Properties");
+
+                    b.HasOne("PropertyPortal.Domain.Entities.Unit", "Unit")
+                        .WithMany("Residents")
+                        .HasForeignKey("UnitId")
+                        .HasConstraintName("FK_Residents_Units");
+
+                    b.Navigation("Property");
+
+                    b.Navigation("Unit");
+                });
+
+            modelBuilder.Entity("PropertyPortal.Domain.Entities.ResidentNote", b =>
+                {
+                    b.HasOne("PropertyPortal.Domain.Entities.Resident", "Resident")
+                        .WithMany()
+                        .HasForeignKey("ResidentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Resident");
+                });
+
             modelBuilder.Entity("PropertyPortal.Domain.Entities.Unit", b =>
                 {
                     b.HasOne("PropertyPortal.Domain.Entities.Property", "Property")
@@ -603,7 +972,14 @@ namespace PropertyPortal.Infrastructure.Migrations
 
             modelBuilder.Entity("PropertyPortal.Domain.Entities.Property", b =>
                 {
+                    b.Navigation("Residents");
+
                     b.Navigation("Units");
+                });
+
+            modelBuilder.Entity("PropertyPortal.Domain.Entities.Resident", b =>
+                {
+                    b.Navigation("Leases");
                 });
 
             modelBuilder.Entity("PropertyPortal.Domain.Entities.Tenant", b =>
@@ -626,6 +1002,8 @@ namespace PropertyPortal.Infrastructure.Migrations
                     b.Navigation("Leases");
 
                     b.Navigation("MaintenanceRequests");
+
+                    b.Navigation("Residents");
                 });
 
             modelBuilder.Entity("PropertyPortal.Domain.Entities.User", b =>

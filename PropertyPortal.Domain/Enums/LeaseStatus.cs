@@ -4,11 +4,9 @@ using System.Text;
 
 namespace PropertyPortal.Domain.Enums
 {
-    public enum UnitStatus
+    public enum LeaseStatus
     {
-        Vacant,
-        Occupied,
-        Maintenance,
-        Reserved
+        Active,
+        Expired
     }
 }

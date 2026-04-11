@@ -11,7 +11,8 @@ namespace PropertyPortal.API.Middleware
         {
             _next = next;
         }
-
+        // when I try to use the scalar page, i get the following error in TenantMiddleware.cs Invoke method: await _next(context)
+        //System.InvalidOperationException: 'CurrentDepth (64) is equal to or larger than the maximum allowed depth of 64. Cannot write the next JSON object or array.'
         public async Task Invoke(HttpContext context)
         {
             var tenantClaim = context.User.FindFirst("TenantId")?.Value;

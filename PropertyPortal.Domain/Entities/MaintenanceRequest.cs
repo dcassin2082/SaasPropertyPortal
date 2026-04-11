@@ -1,4 +1,5 @@
 ﻿using PropertyPortal.Domain.Common;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PropertyPortal.Domain.Entities;
 
@@ -16,6 +17,7 @@ public partial class MaintenanceRequest : BaseEntity
 
     public virtual User CreatedByUser { get; set; } = null!;
 
+    [ForeignKey("TenantId")]
     public virtual Tenant Tenant { get; set; } = null!;
 
     public virtual Unit Unit { get; set; } = null!;
