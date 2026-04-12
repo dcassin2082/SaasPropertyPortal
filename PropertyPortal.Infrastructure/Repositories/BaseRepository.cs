@@ -41,7 +41,7 @@ namespace PropertyPortal.Infrastructure.Repositories
 
         public virtual async Task<T> PutAsync(Guid id, T entity)
         {
-            SyncLocatableFields(entity);
+            //SyncLocatableFields(entity);
             var existing = await _context.Set<T>().FindAsync(id);
             if (existing == null) throw new KeyNotFoundException("Record not found.");
 
@@ -88,7 +88,7 @@ namespace PropertyPortal.Infrastructure.Repositories
 
         public virtual async Task<T> PostAsync(T entity)
         {
-            SyncLocatableFields(entity);
+            //SyncLocatableFields(entity);
             // Force the TenantId from the secure Middleware/Provider
             if (entity is not Tenant)
             {
@@ -160,19 +160,19 @@ namespace PropertyPortal.Infrastructure.Repositories
             return new PaginatedResult<TDestination>(items, count, page, size);
         }
 
-        private void SyncLocatableFields(T entity)
-        {
-            if (entity is Resident resident)
-            {
-                // Auto-populate the ILocatable requirements from the Resident-specific fields
-                resident.Name = $"{resident.FirstName} {resident.LastName}".Trim();
+        //private void SyncLocatableFields(T entity)
+        //{
+        //    if (entity is Resident resident)
+        //    {
+        //        // Auto-populate the ILocatable requirements from the Resident-specific fields
+        //        resident.Name = $"{resident.FirstName} {resident.LastName}".Trim();
 
-                // You could also include the Unit or Property name if they are loaded, 
-                // or just a descriptive string for searchability.
-                //resident.Description = $"Resident at Unit {resident.Address.UnitNumber}";
-                resident.Description = "description";
-            }
-        }
+        //        // You could also include the Unit or Property name if they are loaded, 
+        //        // or just a descriptive string for searchability.
+        //        //resident.Description = $"Resident at Unit {resident.Address.UnitNumber}";
+        //        resident.Description = "description";
+        //    }
+        //}
 
         public async Task AddRangeAsync(IEnumerable<T> entities)
         {

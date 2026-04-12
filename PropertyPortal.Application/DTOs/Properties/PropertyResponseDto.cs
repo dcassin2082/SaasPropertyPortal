@@ -1,6 +1,4 @@
 ﻿using PropertyPortal.Application.DTOs.Units;
-using PropertyPortal.Domain.Common;
-using PropertyPortal.Domain.Entities;
 
 namespace PropertyPortal.Application.DTOs.Properties
 {
@@ -10,9 +8,15 @@ namespace PropertyPortal.Application.DTOs.Properties
 
         public string Name { get; set; } = null!;
 
-        public string? Description { get; set; }
+        public string? Address1 { get; set; } 
 
-        public required Address Address { get; set; }
+        public string? Address2 { get; set; }
+
+        public string? City { get; set; }
+
+        public string? State { get; set; }
+
+        public string? ZipCode { get; set; }
 
         public string? PropertyType { get; set; }
 

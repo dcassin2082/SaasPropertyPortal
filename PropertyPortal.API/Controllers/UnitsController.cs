@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using PropertyPortal.Application.Common.Interfaces;
 using PropertyPortal.Application.DTOs.Units;
 using PropertyPortal.Domain.Entities;
@@ -58,7 +59,6 @@ namespace PropertyPortal.API.Controllers
 
         //    //return Ok(response);
         //}
-        [HttpGet]
         public async Task<ActionResult<IEnumerable<UnitResponseDto>>> GetUnits([FromQuery] Guid? propertyId)
         {
             // Filter by propertyId if it exists, otherwise keep it empty for safety

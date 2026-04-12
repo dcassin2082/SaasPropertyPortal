@@ -64,8 +64,7 @@ namespace PropertyPortal.API.Controllers
             // TEST ONLY: Does this work?
 
             // 1. Get the Queryable (Tenant filtering applied automatically)
-            var query = _uow.Properties.Query().ApplySearch(search);
-
+            var query = _uow.Properties.Query().ApplyPropertySearch(search);
             //// remove this and let the select do the work
             //query = query.Include(u => u.Units).Include(r => r.Residents);
 
@@ -78,12 +77,15 @@ namespace PropertyPortal.API.Controllers
             {
                 Id = p.Id,
                 Name = p.Name,
-                Address = p.Address, // EF8 knows how to map this "Address_" prefix here
+                Address1 = p.Address1, 
+                Address2 = p.Address2, 
+                City = p.City,
+                State = p.State,
+                ZipCode = p.ZipCode, 
                 PropertyType = p.PropertyType,
                 CreatedAt = p.CreatedAt,
                 CreatedBy = p.CreatedBy,
                 IsDeleted = p.IsDeleted,
-                Description = p.Description,
                 // Calculate the aggregates here or keep them in Mapster if you prefer
                 UnitCount = p.Units.Count(),
                 ResidentCount = p.Residents.Count(),

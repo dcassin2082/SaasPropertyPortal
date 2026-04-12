@@ -3,7 +3,7 @@
     public class PropertyLookupDto
     {
         public Guid? Id { get; set; }
-        public string Name { get; set; }
+        public string Name { get; set; } = null!;
         public int ResidentCount { get; set; }
     }
 }

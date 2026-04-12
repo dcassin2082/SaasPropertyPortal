@@ -8,7 +8,7 @@ namespace PropertyPortal.Application.Validators.Properties
     {
         public PropertyCreateDtoValidator()
         {
-            this.ApplyLocatableRules();
+            //this.ApplyLocatableRules();
             //RuleFor(x => x.Name)
             //    .NotEmpty().WithMessage("Property Name is required.")
             //    .MaximumLength(200).WithMessage("Name cannot exceed 200 characters.");

@@ -12,8 +12,8 @@ namespace PropertyPortal.Application.DTOs.Residents
     string FullName,        // Pre-joined: "John Doe"
     string? Email,
     string? Phone,
-    DateOnly LeaseStartDate,
-    DateOnly LeaseEndDate,
+    DateOnly? LeaseStartDate,
+    DateOnly? LeaseEndDate,
     decimal RentAmount,
     bool IsDeleted,
     string DisplayAddress,  // Pre-formatted: "123 Main St, Gilbert, AZ"

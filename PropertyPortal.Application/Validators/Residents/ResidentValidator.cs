@@ -43,28 +43,21 @@ namespace PropertyPortal.Application.Validators.Residents
             RuleFor(x => x.LastName).NotEmpty().MaximumLength(100);
             RuleFor(x => x.Email).EmailAddress().When(x => !string.IsNullOrEmpty(x.Email));
 
-            // 2. Financials
-            RuleFor(x => x.RentAmount)
-                .GreaterThanOrEqualTo(0)
-                .WithMessage("Rent amount cannot be negative.");
-
-            // 3. Lease Logic
-            RuleFor(x => x.LeaseStartDate).NotEmpty();
-            RuleFor(x => x.LeaseEndDate)
-                .NotEmpty()
-                .GreaterThan(x => x.LeaseStartDate)
-                .WithMessage("Lease End Date must be after the Start Date.");
+            //// 2. Financials
+            //RuleFor(x => x.RentAmount)
+            //    .GreaterThanOrEqualTo(0)
+            //    .WithMessage("Rent amount cannot be negative.");
 
             // 4. Relations
             RuleFor(x => x.PropertyId).NotEmpty();
             RuleFor(x => x.UnitId).NotEmpty();
 
-            // 5. The Complex Type Mapping
-            // This triggers your existing AddressValidator for the nested Address record
-            RuleFor(x => x.Address).SetValidator(new AddressValidator());
+            //// 5. The Complex Type Mapping
+            //// This triggers your existing AddressValidator for the nested Address record
+            //RuleFor(x => x.Address).SetValidator(new AddressValidator());
 
-            // 6. Reusing your Shared Logic (ValidationExtensions - extends AbstractValidator<T>
-            this.ApplyLocatableRules();         // Validates Name/Description for search
+            //// 6. Reusing your Shared Logic (ValidationExtensions - extends AbstractValidator<T>
+            //this.ApplyLocatableRules();         // Validates Name/Description for search
         }
 
         //private async Task<bool> BeAnAllowedProperty(Guid propertyId, CancellationToken cancellation)

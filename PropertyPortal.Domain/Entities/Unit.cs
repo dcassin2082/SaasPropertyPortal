@@ -26,8 +26,8 @@ public partial class Unit : BaseEntity
 
     public virtual Tenant Tenant { get; set; } = null!;
 
-    // from ILocatable interface
-    //public string Name { get; set; } = null!;
+    //// from ILocatable interface
+    ////public string Name { get; set; } = null!;
     public string? Description { get; set; }
     public string? UnitType { get; set; } = null!;
     public string? Status { get; set; } = null!;

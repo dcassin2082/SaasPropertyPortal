@@ -32,19 +32,13 @@ public class ResidentsController : ControllerBase
     {
         var userId = _tenantProvider.GetUserId() ?? Guid.Parse("3D91A36C-F52C-45B2-8B47-67B87303640A");
 
-        // 1. Get the list of Property IDs this user is allowed to manage FIRST
+        // 1. Get the list of Property IDs this user is allowed to manage 
         List<Guid?> allowedPropertyIds = await GetManagedPropertyIdsAsync(userId);
 
         // 2. Start the resident query using the pre-fetched IDs
         var query = _uow.Residents.Query()
             .IgnoreQueryFilters()
-            .Where(r => allowedPropertyIds.Contains(r.PropertyId));
-
-        //// Start with a base query of residents the manager is allowed to see
-        //var query = _uow.Residents.Query()
-        //    .IgnoreQueryFilters()
-        //    .Where(r => _uow.PropertyManagers.Query()
-        //        .Any(pm => pm.PropertyId == r.PropertyId && pm.UserId == userId));
+            .Where(r => !r.IsDeleted && allowedPropertyIds.Contains(r.PropertyId));
 
         // If a specific property is selected in the dropdown, filter by it
         if (propertyId.HasValue && propertyId.Value != Guid.Empty)
@@ -53,7 +47,7 @@ public class ResidentsController : ControllerBase
         }
         var now = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        query = status.ToLower() switch
+        query = status?.ToLower() switch
         {
             // Residents who have a lease that covers today
             "active" => query.Where(r => r.Leases.Any(l =>
@@ -71,77 +65,40 @@ public class ResidentsController : ControllerBase
             _ => query
         };
         query = query.ApplyResidentSearch(search);
-        //var residents = await query
-        //    .AsNoTracking() // Important: ignore local cache
-        //    .Select(r => new {
-        //        Res = r,
-        //        // Specifically look for the lease linked by ResidentId
-        //        Lease = r.Leases
-        //            .Where(l => l.Status == "Active" && !l.IsDeleted)
-        //            //.Where(l => l.StartDate <= now && l.EndDate >= now)
-        //            .OrderByDescending(l => l.CreatedAt)
-        //            .FirstOrDefault()
-        //})
-        //.Select(x => new ResidentResponseDto(
-        //    x.Res.Id,
-        //    x.Res.PropertyId,
-        //    x.Res.Property != null ? x.Res.Property.Name : "Unassigned",
-        //    x.Res.UnitId,
-        //    x.Res.Unit != null ? x.Res.Unit.UnitNumber : "N/A",
-        //    $"{x.Res.FirstName} {x.Res.LastName}",
-        //    x.Res.Email,
-        //    x.Res.Phone,
-        //    // If Lease exists, use Lease dates; otherwise, use Resident dates
-        //    x.Lease != null ? x.Lease.StartDate : x.Res.LeaseStartDate,
-        //    x.Lease != null ? x.Lease.EndDate : x.Res.LeaseEndDate,
-        //    // If Lease exists, use Lease rent; otherwise, return 0
-        //    x.Lease != null ? x.Lease.MonthlyRent : 0,
-        //    x.Res.IsDeleted,
-        //    x.Res.Property != null
-        //        ? $"{x.Res.Property.Address.Street}, {x.Res.Property.Address.City}, {x.Res.Property.Address.State}"
-        //        : "No Address",
-        //    x.Lease != null ? x.Lease.Status : x.Res.Status
-        //))
-        //.ToListAsync();
+       
         var residents = await query
-    .AsNoTracking()
-    .Select(r => new {
-        Resident = r,
-        ActiveLease = r.Leases
-            .Where(l => l.Status == "Active" && !l.IsDeleted)
-            .OrderByDescending(l => l.CreatedAt)
-            .FirstOrDefault()
-    })
-    // Flatten the data immediately into primitive types or the DTO
-    .Select(x => new ResidentResponseDto(
-        x.Resident.Id,
-        x.Resident.PropertyId,
-        x.Resident.Property != null ? x.Resident.Property.Name : "Unassigned",
-        x.Resident.UnitId,
-        x.Resident.Unit != null ? x.Resident.Unit.UnitNumber : "N/A",
-        $"{x.Resident.FirstName} {x.Resident.LastName}",
-        x.Resident.Email,
-        x.Resident.Phone,
-        x.ActiveLease != null ? x.ActiveLease.StartDate : x.Resident.LeaseStartDate,
-        x.ActiveLease != null ? x.ActiveLease.EndDate : x.Resident.LeaseEndDate,
-        x.ActiveLease != null ? x.ActiveLease.MonthlyRent : 0,
-        x.Resident.IsDeleted,
-        x.Resident.Property != null
-            ? $"{x.Resident.Property.Address.Street}, {x.Resident.Property.Address.City}, {x.Resident.Property.Address.State}"
-            : "No Address",
-        x.ActiveLease != null ? x.ActiveLease.Status : x.Resident.Status
-    ))
-    .ToListAsync();
-
-        var testLeaseCount = await _uow.Leases.Query().CountAsync();
-        Console.WriteLine($"Total Leases in DB: {testLeaseCount}");
-        var res = residents;
+            .AsNoTracking()
+            .Select(r => new {
+                Resident = r,
+                ActiveLease = r.Leases
+                    .Where(l => l.Status == "Active" && !l.IsDeleted)
+                    .OrderByDescending(l => l.CreatedAt)
+                    .FirstOrDefault()
+            })
+            .Select(x => new ResidentResponseDto(
+                x.Resident.Id,
+                x.Resident.PropertyId,
+                x.Resident.Property != null ? x.Resident.Property.Name : "Unassigned",
+                x.Resident.UnitId,
+                (x.Resident.Unit != null && x.Resident.Unit.UnitNumber != null) ? x.Resident.Unit.UnitNumber : "N/A",
+                $"{x.Resident.FirstName} {x.Resident.LastName}",
+                x.Resident.Email,
+                x.Resident.Phone,
+                x.ActiveLease != null ? x.ActiveLease.StartDate : null,
+                x.ActiveLease != null ? x.ActiveLease.EndDate : null,
+                x.ActiveLease != null ? x.ActiveLease.MonthlyRent : 0,
+                x.Resident.IsDeleted,
+                x.Resident.Property != null
+                    ? $"{x.Resident.Property.Address1}, {x.Resident.Property.Address2}, " +
+                    $"{x.Resident.Property.City}, {x.Resident.Property.State}, {x.Resident.Property.ZipCode}"
+                    : "No Address",
+                x.ActiveLease != null ? x.ActiveLease.Status : x.Resident.Status
+            ))
+            .ToListAsync();
+        
         return Ok(new ResidentListResponse
         {
-            //Residents = residents.Adapt<List<ResidentResponseDto>>(),
-            /*Since you already used .Select(r => new ResidentResponseDto(...)) in your LINQ query, your residents list is already 
-             * a list of DTOs. Calling .Adapt (Mapster) again is redundant and costs extra CPU cycles. You can just do: */
-            Residents = residents, // no need to adapt anything
+            Residents = residents, 
             TotalCount = residents.Count,
             TotalMonthlyRent = residents.Where(r => !r.IsDeleted).Sum(r => r.RentAmount)
         });
@@ -152,7 +109,6 @@ public class ResidentsController : ControllerBase
     {
         var userId = _tenantProvider.GetUserId() ?? Guid.Parse("3D91A36C-F52C-45B2-8B47-67B87303640A");
 
-        // Use DateOnly for comparison to match your Residents model properties
         var now = DateOnly.FromDateTime(DateTime.UtcNow);
         var sixMonthsAgo = now.AddMonths(-6);
 
@@ -162,17 +118,26 @@ public class ResidentsController : ControllerBase
         .Where(r => _uow.PropertyManagers.Query()
             .Any(pm => pm.PropertyId == r.PropertyId && pm.UserId == userId));
 
+
         // 2. Filter and Group
         var trends = await baseQuery
-        .Where(r => r.LeaseStartDate <= now && r.LeaseEndDate >= sixMonthsAgo && !r.IsDeleted)
+            .Select(r => new {
+                Resident = r,
+                ActiveLease = r.Leases
+                    .Where(l => l.Status == "Active" && !l.IsDeleted)
+                    .OrderByDescending(l => l.CreatedAt)
+                    .FirstOrDefault()
+            })
+        //.Where(r => r.LeaseStartDate <= now && r.LeaseEndDate >= sixMonthsAgo && !r.IsDeleted)
+        .Where(r => r.ActiveLease.StartDate <= now && r.ActiveLease.EndDate >= sixMonthsAgo)
         // Grouping by Year and Month for chronological order
-        .GroupBy(r => new { r.LeaseStartDate.Year, r.LeaseStartDate.Month })
+        .GroupBy(r => new { r.ActiveLease.StartDate.Year, r.ActiveLease.StartDate.Month })
         .Select(g => new
         {
             Year = g.Key.Year,
             Month = g.Key.Month,
-            Revenue = g.Sum(r => r.RentAmount),
-            Projected = g.Sum(r => r.RentAmount) * 1.1m
+            Revenue = g.Sum(r => r.ActiveLease.MonthlyRent),
+            Projected = g.Sum(r => r.ActiveLease.MonthlyRent) * 1.1m
         })
         .ToListAsync();
 
@@ -212,40 +177,6 @@ public class ResidentsController : ControllerBase
         return Ok(residents);
     }
 
-    //[HttpGet]
-    //public async Task<ActionResult<IEnumerable<ResidentResponseDto>>> GetResidents([FromQuery] string? search = null)
-    //{
-    //    var userId = _tenantProvider.GetUserId() ?? Guid.Parse("3D91A36C-F52C-45B2-8B47-67B87303640A");
-    //    var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Manager";
-
-    //    var query = _uow.Residents.Query().IgnoreQueryFilters().Include(r => r.Property).AsQueryable();
-
-    //    // Use a simpler join for debugging
-    //    query = query.Where(r => _uow.PropertyManagers.Query()
-    //        //.IgnoreQueryFilters()
-    //        .Any(pm => pm.PropertyId == r.PropertyId && pm.UserId == userId));
-
-
-    //    if (userRole == "Manager")
-    //    {
-    //        query = query.Where(r => _uow.PropertyManagers.Query().Any(pm => pm.PropertyId == r.PropertyId && pm.UserId == userId));
-    //    }
-    //    query = query.ApplySearch(search);
-
-    //    var residents = await query.Include(r => r.Unit).ThenInclude(u => u.Property).ToListAsync();
-
-    //    var response = new ResidentListResponse
-    //    {
-    //        Residents = residents.Adapt<List<ResidentResponseDto>>(),
-    //        TotalCount = residents.Count(),
-    //        TotalMonthlyRent = residents.Sum(r => r.RentAmount)
-    //    };
-
-    //    return Ok(response);
-
-    //    //return Ok(residents.Adapt<List<ResidentResponseDto>>());
-    //}
-
     [HttpGet("export")]
     public async Task<IActionResult> ExportResidents(
     [FromQuery] string? search = null,
@@ -253,7 +184,7 @@ public class ResidentsController : ControllerBase
     [FromQuery] string? status = null)
     {
         var userId = _tenantProvider.GetUserId() ?? Guid.Parse("3D91A36C-F52C-45B2-8B47-67B87303640A");
-        var now = DateTime.UtcNow;
+        var now = DateOnly.FromDateTime(DateTime.UtcNow);
 
         // Use the SAME filtering logic as your GetResidents method
         var query = _uow.Residents.Query()
@@ -264,17 +195,33 @@ public class ResidentsController : ControllerBase
         if (propertyId.HasValue && propertyId.Value != Guid.Empty)
             query = query.Where(r => r.PropertyId == propertyId.Value);
 
-        if (!string.IsNullOrEmpty(status))
+        //if (!string.IsNullOrEmpty(status))
+        //{
+        //    query = status.ToLower() switch
+        //    {
+        //        "active" => query.Where(r => r.LeaseStartDate <= DateOnly.FromDateTime(now) && r.LeaseEndDate >= DateOnly.FromDateTime(now)),
+        //        "upcoming" => query.Where(r => r.LeaseStartDate > DateOnly.FromDateTime(now)),
+        //        "past" => query.Where(r => r.LeaseEndDate < DateOnly.FromDateTime(now)),
+        //        _ => query
+        //    };
+        //}
+        query = status?.ToLower() switch
         {
-            query = status.ToLower() switch
-            {
-                "active" => query.Where(r => r.LeaseStartDate <= DateOnly.FromDateTime(now) && r.LeaseEndDate >= DateOnly.FromDateTime(now)),
-                "upcoming" => query.Where(r => r.LeaseStartDate > DateOnly.FromDateTime(now)),
-                "past" => query.Where(r => r.LeaseEndDate < DateOnly.FromDateTime(now)),
-                _ => query
-            };
-        }
+            // Residents who have a lease that covers today
+            "active" => query.Where(r => r.Leases.Any(l =>
+                l.Status == "Active" &&
+                l.StartDate <= now &&
+                l.EndDate >= now)),
 
+            // Residents who have a lease starting in the future, but no currently active ones
+            "upcoming" => query.Where(r => r.Leases.Any(l => l.StartDate > now) &&
+                                        !r.Leases.Any(l => l.StartDate <= now && l.EndDate >= now)),
+
+            // Residents where all leases are in the past
+            "past" => query.Where(r => r.Leases.All(l => l.EndDate < now) && r.Leases.Any()),
+
+            _ => query
+        };
         var residents = await query.Include(r => r.Property).ToListAsync();
 
         // Generate CSV String
@@ -283,7 +230,8 @@ public class ResidentsController : ControllerBase
 
         foreach (var r in residents)
         {
-            csv.AppendLine($"{r.FirstName},{r.LastName},{r.Property.Name},{r.RentAmount},{r.LeaseEndDate:yyyy-MM-dd}");
+            var activeLease = r.Leases.Where(l => l.Status == "Active").OrderByDescending(l => l.CreatedAt).FirstOrDefault();
+            csv.AppendLine($"{r.FirstName},{r.LastName},{r.Property.Name},{activeLease.MonthlyRent},{activeLease.EndDate:yyyy-MM-dd}");
         }
 
         var bytes = Encoding.UTF8.GetBytes(csv.ToString());
@@ -302,18 +250,43 @@ public class ResidentsController : ControllerBase
             .Any(pm => pm.PropertyId == r.PropertyId && pm.UserId == userId))
         .ToListAsync();
 
+        // NEED TO FIGURE THIS OUT 
         foreach (var resident in residents)
         {
-            // 2. Apply Rent Logic
-            if (request.PercentIncrease.HasValue)
-                resident.RentAmount *= (decimal)(1 + (request.PercentIncrease.Value / 100));
-            else if (request.NewRentAmount.HasValue)
-                resident.RentAmount = request.NewRentAmount.Value;
+            // 1. Find the lease that is being renewed
+            var currentLease = resident.Leases
+                .Where(l => l.Status == "Active")
+                .OrderByDescending(l => l.EndDate)
+                .FirstOrDefault();
 
-            // 3. Apply Date Logic
-            resident.LeaseStartDate = DateOnly.FromDateTime(DateTime.UtcNow);
-            resident.LeaseEndDate = DateOnly.FromDateTime(request.NewEndDate);
-            await _uow.Residents.PutAsync(resident.Id, resident);
+            if (currentLease == null) continue;
+
+            // 2. Calculate the new rent
+            decimal newRent = currentLease.MonthlyRent;
+            if (request.PercentIncrease.HasValue)
+                newRent *= (1 + (decimal)request.PercentIncrease.Value / 100);
+            else if (request.NewRentAmount.HasValue)
+                newRent = request.NewRentAmount.Value;
+
+            // 3. Update the OLD lease status (Optional: or let it expire naturally)
+            currentLease.Status = "Renewed";
+
+            // 4. Create the NEW lease record
+            var renewedLease = new Lease
+            {
+                Id = Guid.NewGuid(),
+                TenantId = currentLease.TenantId,
+                PropertyId = currentLease.PropertyId,
+                UnitId = currentLease.UnitId,
+                ResidentId = resident.Id,
+                UserId = (Guid)userId, // The manager doing the renewal
+                StartDate = currentLease.EndDate.AddDays(1), // Start day after old one ends
+                EndDate = DateOnly.FromDateTime(request.NewEndDate),
+                MonthlyRent = newRent,
+                Status = "Active"
+            };
+
+            await _uow.Leases.PostAsync(renewedLease);
         }
 
         await _uow.CompleteAsync();
@@ -336,12 +309,12 @@ public class ResidentsController : ControllerBase
     [HttpGet("{id}")]
     public async Task<ActionResult<ResidentResponseDto>> GetResident(Guid id)
     {
-        //var resident = await _uow.Residents.Query()
-        //    .Include(r => r.Property)
-        //    //.IgnoreQueryFilters()
-        //    .FirstOrDefaultAsync(x => x.Id == id);
+        var resident = await _uow.Residents.Query()
+            //.Include(r => r.Leases)
+            //.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.Id == id);
 
-        var resident = await _uow.Residents.GetByIdAsync(id);
+        //var resident = await _uow.Residents.GetByIdAsync(id);
         if (resident == null) return NotFound();
 
         return Ok(resident.Adapt<ResidentResponseDto>());
@@ -507,8 +480,8 @@ public class ResidentsController : ControllerBase
             // 2. Update the Resident (The Occupancy Link)
             resident.UnitId = unit.Id;
             // Optional: Keep these in sync if you're still using the Resident columns for now
-            resident.LeaseStartDate = request.StartDate;
-            resident.LeaseEndDate = request.EndDate;
+            //resident.LeaseStartDate = request.StartDate;
+            //resident.LeaseEndDate = request.EndDate;
 
             // 3. Update the Unit (The Inventory Status)
             unit.Status = "Occupied";
@@ -525,59 +498,59 @@ public class ResidentsController : ControllerBase
         }
     }
 
-    [HttpPatch("{residentId}/move-in/{unitId}")]
-    public async Task<IActionResult> MoveIn(Guid residentId, Guid unitId)
-    {
-        // Start a Transaction (Very important for Lead roles)
-        using var transaction = await _uow.BeginTransactionAsync();
+    //[HttpPatch("{residentId}/move-in/{unitId}")]
+    //public async Task<IActionResult> MoveIn(Guid residentId, Guid unitId)
+    //{
+    //    // Start a Transaction (Very important for Lead roles)
+    //    using var transaction = await _uow.BeginTransactionAsync();
 
-        try
-        {
-            var resident = await _uow.Residents.GetByIdAsync(residentId);
-            //var targetUnit = await _uow.Units.GetByIdAsync(unitId);
+    //    try
+    //    {
+    //        var resident = await _uow.Residents.GetByIdAsync(residentId);
+    //        //var targetUnit = await _uow.Units.GetByIdAsync(unitId);
 
-            // Lead-level Validation: Is the resident already in another unit?
-            if (resident?.UnitId != null)
-            {
-                // This turns a "Move-In" into a "Transfer"
-                _logger.LogInformation("Resident {id} is transferring units.", residentId);
-            }
+    //        // Lead-level Validation: Is the resident already in another unit?
+    //        if (resident?.UnitId != null)
+    //        {
+    //            // This turns a "Move-In" into a "Transfer"
+    //            _logger.LogInformation("Resident {id} is transferring units.", residentId);
+    //        }
 
-            resident?.UnitId = unitId;
-            resident?.Status = "Active";
+    //        resident?.UnitId = unitId;
+    //        resident?.Status = "Active";
 
-            // Update the Address record on the resident to match the new unit
-            var targetUnit = await _uow.Units.Query()
-                .Include(u => u.Property) // Include this if you need to check Property rules
-                .FirstOrDefaultAsync(u => u.Id == unitId);
+    //        // Update the Address record on the resident to match the new unit
+    //        var targetUnit = await _uow.Units.Query()
+    //            .Include(u => u.Property) // Include this if you need to check Property rules
+    //            .FirstOrDefaultAsync(u => u.Id == unitId);
 
-            if (targetUnit == null) return NotFound("Unit not found.");
+    //        if (targetUnit == null) return NotFound("Unit not found.");
 
-            // 2. Perform your logic now that you have the object
-            //targetUnit.Status = "Occupied";
-            targetUnit.Status = UnitStatus.Occupied.ToString();
+    //        // 2. Perform your logic now that you have the object
+    //        //targetUnit.Status = "Occupied";
+    //        targetUnit.Status = UnitStatus.Occupied.ToString();
 
-            resident?.Address = new Address(
-                targetUnit?.Property.Address.Street,
-                targetUnit?.UnitNumber,
-                targetUnit?.Property.Address.City,
-                targetUnit?.Property.Address.State,
-                targetUnit?.Property.Address.ZipCode
-            );
+    //        resident?.Address = new Address(
+    //            targetUnit?.Property.Address.Street,
+    //            targetUnit?.UnitNumber,
+    //            targetUnit?.Property.Address.City,
+    //            targetUnit?.Property.Address.State,
+    //            targetUnit?.Property.Address.ZipCode
+    //        );
 
-            if (targetUnit is not null)
-                await _uow.Units.PutAsync(unitId, targetUnit);
-            await _uow.CompleteAsync();
-            await transaction.CommitAsync();
+    //        if (targetUnit is not null)
+    //            await _uow.Units.PutAsync(unitId, targetUnit);
+    //        await _uow.CompleteAsync();
+    //        await transaction.CommitAsync();
 
-            return Ok();
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            return StatusCode(500, "Transaction failed during Move-In.");
-        }
-    }
+    //        return Ok();
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        await transaction.RollbackAsync();
+    //        return StatusCode(500, "Transaction failed during Move-In.");
+    //    }
+    //}
 
     [HttpPut("{id}")]
     public async Task<IActionResult> PutResident(Guid id, ResidentRequestDto dto)

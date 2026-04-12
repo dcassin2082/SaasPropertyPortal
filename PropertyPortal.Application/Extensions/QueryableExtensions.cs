@@ -14,38 +14,52 @@ namespace PropertyPortal.Application.Extensions
 
             return query.Where(p =>
                 p.Name.Contains(searchTerm) ||
-                (p.Address.Street != null && p.Address.Street.Contains(searchTerm)) ||
-                (p.Address.City != null && p.Address.City.Contains(searchTerm)) ||
-                (p.Address.ZipCode != null && p.Address.ZipCode.Contains(searchTerm)));
+                (p.Address1 != null && p.Address1.Contains(searchTerm)) ||
+                (p.City != null && p.City.Contains(searchTerm)) ||
+                (p.ZipCode != null && p.ZipCode.Contains(searchTerm)));
         }
 
-        public static IQueryable<T> ApplySearch<T>(this IQueryable<T> query, string? term) where T : class, ILocatable
+        //public static IQueryable<T> ApplySearch<T>(this IQueryable<T> query, string? term) where T : class //, ILocatable
+        //{
+        //    if (string.IsNullOrWhiteSpace(term)) return query;
+
+        //    term = term.Trim();
+
+        //    return query.Where(x =>
+        //        x.Name.Contains(term) ||
+        //         (x.Address1 != null && x.Address.Street.Contains(term)) ||
+        //         (x.Address.City != null && x.Address.City.Contains(term)) ||
+        //         (x.Address.ZipCode != null && x.Address.ZipCode.Contains(term)) ||
+        //          x.Description != null && x.Description.Contains(term));
+        //}
+
+        public static IQueryable<T> ApplyPropertySearch<T>(this IQueryable<T> query, string? term) where T : Property
         {
             if (string.IsNullOrWhiteSpace(term)) return query;
 
             term = term.Trim();
-
             return query.Where(x =>
                 x.Name.Contains(term) ||
-                 (x.Address.Street != null && x.Address.Street.Contains(term)) ||
-                 (x.Address.City != null && x.Address.City.Contains(term)) ||
-                 (x.Address.ZipCode != null && x.Address.ZipCode.Contains(term)) ||
-                  x.Description != null && x.Description.Contains(term));
+                x.Name.Contains(term) ||
+                 (x.Address1 != null && x.Address1.Contains(term)) ||
+                 (x.City != null && x.City.Contains(term)) ||
+                 (x.State != null && x.State.Contains(term)) ||
+                 (x.ZipCode != null && x.ZipCode.Contains(term)));
         }
 
-        public static IQueryable<T> ApplyResidentSearch<T>(this IQueryable<T> query, string? term) where T : Resident, ILocatable
+        public static IQueryable<T> ApplyResidentSearch<T>(this IQueryable<T> query, string? term) where T : Resident //, ILocatable
         {
             if (string.IsNullOrWhiteSpace(term)) return query;
 
             term = term.Trim();
             return query.Where(x =>
                 x.FirstName.Contains(term) ||
-                x.LastName.Contains(term) ||
-                x.Name.Contains(term) ||
-                 (x.Address.Street != null && x.Address.Street.Contains(term)) ||
-                 (x.Address.City != null && x.Address.City.Contains(term)) ||
-                 (x.Address.ZipCode != null && x.Address.ZipCode.Contains(term)) ||
-                  x.Description != null && x.Description.Contains(term));
+                x.LastName.Contains(term));
+                //x.Name.Contains(term) ||
+                // (x.Address.Street != null && x.Address.Street.Contains(term)) ||
+                // (x.Address.City != null && x.Address.City.Contains(term)) ||
+                // (x.Address.ZipCode != null && x.Address.ZipCode.Contains(term)) ||
+                //  x.Description != null && x.Description.Contains(term));
         }
 
         public static IQueryable<Lease> WhereActive(this IQueryable<Lease> query)

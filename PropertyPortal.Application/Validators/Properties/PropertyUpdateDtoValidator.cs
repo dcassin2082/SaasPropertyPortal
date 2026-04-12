@@ -9,7 +9,7 @@ namespace PropertyPortal.Application.Validators.Properties
         public PropertyUpdateDtoValidator()
         {
             RuleFor(x => x.Id).NotEmpty().WithMessage("Id is required for updates.");
-            this.ApplyLocatableRules();
+            //this.ApplyLocatableRules();
 
             // Ensure RowVersion is present for the concurrency check
             RuleFor(x => x.RowVersion)

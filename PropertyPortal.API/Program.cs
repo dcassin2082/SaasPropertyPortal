@@ -55,7 +55,7 @@ builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Prope
 // same thing with null checking
 TypeAdapterConfig<Property, PropertyResponseDto>
     .NewConfig()
-    .Map(dest => dest.Address, src => src.Address) // force explicit mapping of the Address record
+    //.Map(dest => dest.Address, src => src.Address) // force explicit mapping of the Address record
     .Map(dest => dest.UnitCount, src => src.Units != null ? src.Units.Count : 0)
     .Map(dest => dest.TotalMonthlyRent, src => src.Units != null ? src.Units.Sum(u => u.Rent) : 0);
 
@@ -89,9 +89,9 @@ TypeAdapterConfig<Resident, ResidentResponseDto>
             .Select(l => l.EndDate)
             .FirstOrDefault());
 
-TypeAdapterConfig<ResidentRequestDto, Resident>
-    .NewConfig()
-    .Map(dest => dest.Address, src => src.Address);
+//TypeAdapterConfig<ResidentRequestDto, Resident>
+//    .NewConfig()
+//    .Map(dest => dest.Address, src => src.Address);
 
 TypeAdapterConfig<Unit, UnitResponseDto>.NewConfig()
     .Map(dest => dest.PropertyName, src => src.Property.Name);

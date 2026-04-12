@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 
 namespace PropertyPortal.Domain.Entities
 {
-    public partial class Resident : BaseEntity, ILocatable
+    public partial class Resident : BaseEntity //, ILocatable
     {
         public Guid PropertyId { get; set; }
 
@@ -18,11 +18,11 @@ namespace PropertyPortal.Domain.Entities
 
         public string? Phone { get; set; }
 
-        public DateOnly LeaseStartDate { get; set; }
+        //public DateOnly LeaseStartDate { get; set; }
 
-        public DateOnly LeaseEndDate { get; set; }
+        //public DateOnly LeaseEndDate { get; set; }
 
-        public decimal RentAmount { get; set; }
+        //public decimal RentAmount { get; set; }
 
         public virtual Property? Property { get; set; } 
 
@@ -30,11 +30,10 @@ namespace PropertyPortal.Domain.Entities
 
         public virtual ICollection<Lease> Leases { get; set; } = new List<Lease>();
 
-        // ILocatable fields - remember this is for searching (Name = (FirstName + LastName), Description are not really needed on Residents table 
-        public Address Address { get; set; } = null!; // EF will flatten this into Property_Street, etc.
-        public string Name { get; set; } = null!;
-        public string? Description { get; set; }
-        // Map existing fields to the interface requirements
+        //// ILocatable fields - remember this is for searching (Name = (FirstName + LastName), Description are not really needed on Residents table 
+        //public Address Address { get; set; } = null!; // EF will flatten this into Property_Street, etc.
+        //public string Name { get; set; } = null!;
+        //public string? Description { get; set; }
 
         public string? Status { get; set; }
     }

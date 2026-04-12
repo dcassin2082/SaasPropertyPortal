@@ -8,6 +8,8 @@ public partial class Lease : BaseEntity
 {
     public Guid ResidentId { get; set; }
 
+    public Guid PropertyId { get; set; }
+
     [ForeignKey("TenantId")]
     public virtual Tenant Tenant { get; set; } = null!;
 
