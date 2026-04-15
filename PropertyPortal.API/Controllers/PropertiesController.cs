@@ -2,6 +2,7 @@
 using Mapster;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Build.Framework;
 using Microsoft.EntityFrameworkCore;
 using PropertyPortal.Application.Common.Interfaces;
 using PropertyPortal.Application.Common.Models;
@@ -43,7 +44,8 @@ namespace PropertyPortal.API.Controllers
                 {
                     Id = pm.PropertyId,
                     Name = pm.Property.Name,
-                    ResidentCount = _uow.Residents.Query().IgnoreQueryFilters().Count(r => r.PropertyId == pm.PropertyId)
+                    ResidentCount = _uow.Residents.Query().Count(r => r.PropertyId == pm.PropertyId),
+                    ApplicantCount = _uow.Applicants.Query().Count(r => r.PropertyId == pm.PropertyId)
                 })
                 .Distinct()
                 .OrderBy(p => p.Name)
@@ -165,7 +167,11 @@ namespace PropertyPortal.API.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<PropertyResponseDto>> GetProperty(Guid id)
         {
-            var property = await _uow.Properties.Query().Include(p => p.Units)
+            var property = await _uow.Properties.Query()
+                .Include(p => p.Units
+                .OrderBy(u => u.UnitNumber.Length)
+                .ThenBy(u => u.UnitNumber))
+                .ThenInclude(u => u.Residents) // Include residents to check occupancy in-memory
                 .FirstOrDefaultAsync(p => p.Id == id);
 
             if (property == null)
@@ -173,12 +179,21 @@ namespace PropertyPortal.API.Controllers
 
             var dto = property.Adapt<PropertyResponseDto>();
             // Calculate IsOccupied for each unit
+            //foreach (var unitDto in dto.Units)
+            //{
+            //    unitDto.IsOccupied = await _uow.Residents.Query()
+            //        .AnyAsync(r => r.UnitId == unitDto.Id && !r.IsDeleted);
+            //}
             foreach (var unitDto in dto.Units)
             {
-                unitDto.IsOccupied = await _uow.Residents.Query()
-                    .AnyAsync(r => r.UnitId == unitDto.Id && !r.IsDeleted);
+                // Check the mapped collection instead of a new DB call
+                var unitEntity = property.Units.First(u => u.Id == unitDto.Id);
+                unitDto.IsOccupied = unitEntity.Residents.Any(r => !r.IsDeleted);
             }
-
+            dto.Units = dto.Units
+                .OrderBy(u => u.UnitNumber.Length)
+                .ThenBy(u => u.UnitNumber)
+                .ToList();
             return Ok(dto);
             //var property = await _uow.Properties.GetByIdAsync(id);
             //if (property == null)
@@ -211,11 +226,76 @@ namespace PropertyPortal.API.Controllers
         {
             var property = dto.Adapt<Property>();
             await _uow.Properties.PostAsync(property);
+
+            var userId = _tenantProvider.GetUserId(); // Extracted from JWT
+            var managerLink = new PropertyManager
+            {
+                PropertyId = property.Id,
+                UserId = (Guid)userId,
+                TenantId = _tenantProvider.GetTenantId()
+            };
+
+            await _uow.PropertyManagers.PostAsync(managerLink);
             await _uow.CompleteAsync();
 
             return CreatedAtAction(nameof(GetProperties), new { id = property.Id }, property);
         }
 
+        // Add the property manager stuff here
+        //[HttpPost]
+        //public async Task<IActionResult> CreateProperty([FromBody] PropertyDto dto)
+        //{
+        //    var userId = _tenantProvider.GetUserId(); // Extracted from JWT
+
+        //    var property = new Property
+        //    {
+        //        Id = Guid.NewGuid(),
+        //        Name = dto.Name,
+        //        // ... (Assign Address1, City, State, etc.)
+        //    };
+
+        //    // Create the relationship record
+        //    var managerLink = new PropertyManager
+        //    {
+        //        PropertyId = property.Id,
+        //        UserId = (Guid)userId
+        //    };
+
+        //    await _uow.Properties.AddAsync(property);
+        //    await _uow.PropertyManagers.AddAsync(managerLink);
+        //    await _uow.CompleteAsync();
+
+        //    return Ok(property);
+        //}
+        //// OR THIS ONE
+        //[HttpPost]
+        //public async Task<IActionResult> CreateProperty([FromBody] CreatePropertyRequest request)
+        //{
+        //    var userId = _tenantProvider.GetUserId();
+        //    var tenantId = _tenantProvider.GetTenantId();
+
+        //    var property = new Property
+        //    {
+        //        Id = Guid.NewGuid(),
+        //        TenantId = tenantId,
+        //        Name = request.Name,
+        //        // ... set flattened address fields ...
+        //    };
+
+        //    // THE LINK: Add the row to PropertyManagers
+        //    var managerLink = new PropertyManager
+        //    {
+        //        PropertyId = property.Id,
+        //        UserId = (Guid)userId
+        //    };
+
+        //    await _uow.Properties.AddAsync(property);
+        //    await _uow.PropertyManagers.AddAsync(managerLink); // Assuming you have this repo
+
+        //    await _uow.CompleteAsync();
+
+        //    return Ok(property);
+        //}
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteProperty(Guid id)
         {

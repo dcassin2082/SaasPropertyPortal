@@ -8,6 +8,7 @@ public partial class MaintenanceRequest : BaseEntity
     public Guid UnitId { get; set; }
 
     public Guid CreatedByUserId { get; set; }
+    public Guid PropertyId { get; set; }
 
     public string Description { get; set; } = null!;
 
@@ -21,4 +22,6 @@ public partial class MaintenanceRequest : BaseEntity
     public virtual Tenant Tenant { get; set; } = null!;
 
     public virtual Unit Unit { get; set; } = null!;
+
+    public string? Subject { get; set; }
 }

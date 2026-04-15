@@ -6,6 +6,8 @@ namespace PropertyPortal.Domain.Entities;
 
 public partial class Lease : BaseEntity
 {
+    public Guid Id { get; set; }
+
     public Guid ResidentId { get; set; }
 
     public Guid PropertyId { get; set; }
@@ -34,6 +36,9 @@ public partial class Lease : BaseEntity
     public virtual Unit Unit { get; set; } = null!;
 
     public virtual User User { get; set; } = null!;
+
+    public virtual Property Property { get; set; } = null!;
+
     public bool IsCurrentlyActive =>
         Status == "Active" &&
         StartDate <= DateOnly.FromDateTime(DateTime.UtcNow) &&

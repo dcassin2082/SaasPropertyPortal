@@ -1,4 +1,5 @@
-﻿using Mapster;
+﻿using Azure.Core;
+using Mapster;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -136,6 +137,19 @@ namespace PropertyPortal.API.Controllers
         [HttpPost("bulk")]
         public async Task<ActionResult> BulkCreate([FromBody] UnitBulkCreateDto dto)
         {
+            var existingNumbers = await _uow.Units.Query()
+                .Where(u => u.PropertyId == dto.PropertyId)
+                .Select(u => u.UnitNumber)
+                .ToListAsync();
+
+            var requestedNumbers = Enumerable.Range(dto.StartingNumber, dto.Count)
+                .Select(n => n.ToString());
+
+            if (requestedNumbers.Any(n => existingNumbers.Contains(n)))
+            {
+                return BadRequest("One or more unit numbers already exist for this property.");
+            }
+
             var property = await _uow.Properties.GetByIdAsync(dto.PropertyId);
             if (property == null) return NotFound("Property not found");
 

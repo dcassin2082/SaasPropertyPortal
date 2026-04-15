@@ -30,10 +30,21 @@ public class ResidentsController : ControllerBase
     [FromQuery] Guid? propertyId = null,
     [FromQuery] string? status = null)
     {
-        var userId = _tenantProvider.GetUserId() ?? Guid.Parse("3D91A36C-F52C-45B2-8B47-67B87303640A");
+        ///*Now that the database is clean, your GetResidentById won't have to fight redundant columns. Since you're using a blank slate, 
+        // * remember to use .Include(r => r.Leases) if you want to see the dates in your React frontend.
+        // * 
+        // * */
+        //var resident = await _uow.Residents.Query()
+        //    .Include(r => r.Leases) // Now it will find the new Lease table
+        //    .FirstOrDefaultAsync(x => x.Id == id);
+        //***********************************************************************************************************************
+        var userId = _tenantProvider.GetUserId(); // ?? Guid.Parse("3D91A36C-F52C-45B2-8B47-67B87303640A");
+
+        if (userId == null || userId == Guid.Empty)
+            return BadRequest();
 
         // 1. Get the list of Property IDs this user is allowed to manage 
-        List<Guid?> allowedPropertyIds = await GetManagedPropertyIdsAsync(userId);
+        List<Guid?> allowedPropertyIds = await GetManagedPropertyIdsAsync((Guid)userId);
 
         // 2. Start the resident query using the pre-fetched IDs
         var query = _uow.Residents.Query()
@@ -222,7 +233,7 @@ public class ResidentsController : ControllerBase
 
             _ => query
         };
-        var residents = await query.Include(r => r.Property).ToListAsync();
+        var residents = await query.Include(r => r.Property).Include(r => r.Leases).ToListAsync();
 
         // Generate CSV String
         var csv = new StringBuilder();
@@ -399,8 +410,7 @@ public class ResidentsController : ControllerBase
         //              rent values change constantly, also change based on the length of the lease
 
         // Test Guid - remove after setting up front end
-        Guid applicantId = Guid.Parse("8861C6BA-E5BD-4961-9B1E-29CA17C63A44");
-        var applicant = await _uow.Applicants.GetByIdAsync(applicantId);
+        var applicant = await _uow.Applicants.GetByIdAsync(dto.ApplicantId);
 
         // 1. Create Resident from Applicant data
         var resident = new Resident
@@ -424,6 +434,7 @@ public class ResidentsController : ControllerBase
             EndDate = dto.LeaseEndDate,
             MonthlyRent = dto.RentAmount,
             UserId = (Guid)userId,
+            PropertyId = dto.PropertyId,
             Status = "Active"
             //StartDate = wizardDto.StartDate,
             //EndDate = wizardDto.EndDate,

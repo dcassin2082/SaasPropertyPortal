@@ -7,6 +7,7 @@ namespace PropertyPortal.Application.DTOs.Residents
         Guid TenantId,
         Guid PropertyId,
         Guid UnitId,
+        Guid ApplicantId,
         string FirstName,
         string LastName,
         string? Email,
